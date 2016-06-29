@@ -1,7 +1,9 @@
 //Average_Textures.h
 #pragma once
 #include "matrix.h"
+#include <array>
 using namespace std;
 typedef unsigned short T;
+const T h = 3;
 
-matrix< vector< pair<T, bool> > > get_textures_merge(const matrix<T>& source, size_t number_of_textures_in_node = 3) throw(exception);
+matrix< array<pair<T, bool>, 3> > get_textures_arrangement/*взять расстановку текстур*/(const matrix<T>& source) throw(exception);

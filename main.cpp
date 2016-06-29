@@ -30,7 +30,7 @@ int main(){
 	////////////////////////////////////////////////////////
 	
 	
-	auto res = get_textures_merge(source);
+	auto res = get_textures_arrangement(source);
 	
 	T w = res.get_w(), h = res.get_h(), max_n_textures_in_row, tmp, str_len = 6;
 	string s, space("  ");
