@@ -5,14 +5,21 @@
 #include <memory>
 
 int main(){
-	const T dimension = 4;
-	T arr[dimension * dimension] = {
+	const T w = 4, h = 5;
+	/*T arr[w * h] = {
 		3, 3, 3, 1,
 		3, 2, 2, 1,
 		3, 2, 2, 1,
 		0, 0, 0, 0
+	};*/
+	T arr[w * h] = {
+		0, 0, 0, 0,
+		1, 1, 1, 2,
+		1, 1, 1, 2,
+		2, 2, 2, 2,
+		3, 3, 3, 3
 	};
-	//T arr[dimension * dimension] = {
+	//T arr[w * h] = {
 	//	3, 3, 3, 1, 0,
 	//	3, 2, 4, 1, 3,
 	//	4, 2, 2, 1, 2,
@@ -21,18 +28,16 @@ int main(){
 	//};
 
 	vector<T> vec(arr, (T*)((char*)arr + sizeof(arr)));
-	matrix<T> source(dimension, dimension);
+	matrix<T> source(w, h);
 
 	auto iter = vec.begin();
 	for (auto i = source.begin(), end = source.end(); i != end; i++) *i = *iter++;
 
-	
-	////////////////////////////////////////////////////////
-	
+	////////////////////////////////////////////////////////	
 	
 	auto res = get_textures_arrangement(source);
 	
-	T w = res.get_w(), h = res.get_h(), max_n_textures_in_row, tmp, str_len = 6;
+	T max_n_textures_in_row, tmp, str_len = 6;
 	string s, space("  ");
 	unique_ptr<char, default_delete<char[]> > line(new char[str_len + space.length() + 1]), big_space(new char[str_len + space.length() + 1]);
 
