@@ -4,6 +4,7 @@
 #include "Average_Textures.h"
 #include <iostream>
 #include <list>
+#include <map>
 //#include <set>
 
 
@@ -122,7 +123,7 @@ vector<_T> move_to_vector(list<_T> &&list){
 }
 
 struct info{//информация про узел
-	enum level {NONE = 0, FIRST = 1, SECOND = 2, THIRD = 4};
+	enum level : char {NONE = 0, FIRST = 1, SECOND = 2, THIRD = 4};
 private:
 	char used;//использованные уровни
 	char taken;//уровни, взятые в предыдущих соседних узлах.
@@ -132,7 +133,16 @@ private:
 	bool edge_of_space;
 	T texture;
 	vector< node > valuable_neighbors;
-	array<int, 8> memory;
+	array< map< vector<char> , char> , 8> memory;
+
+	vector<char> get_situation(){
+		vector<char> situation(valuable_neighbors.size());
+		char j = 0;
+		for (const auto& i : valuable_neighbors){
+			situation[j++] = (*owner)(i.x, i.y).cur_level;
+		}
+		return situation;
+	}
 public:
 	int cur_level;//показывает на каком уровне сейчас стоит 1
 	array< T , 3 > textures;//(значимые только те текстуры, которые отмечены в taken или в given или в cur_level)
@@ -233,7 +243,6 @@ public:
 			(*owner)(n.x, n.y - 1).give(cur_level, texture);
 		}
 		used |= cur_level;
-		memory[taken] |= cur_level;
 		textures[cur_level / 2] = texture;
 
 		if ((FIRST | SECOND | THIRD) ^ (taken | used)){//какой-то уровень остался и его можно было бы использовать при другой расстановке
@@ -246,7 +255,10 @@ public:
 	}
 
 	bool was_here(){
-		return memory[taken] & cur_level;
+		return memory[taken][get_situation()] & cur_level;
+	}
+	void remember(){		
+		memory[taken][get_situation()] |= cur_level;
 	}
 
 	void clear(){
@@ -254,7 +266,7 @@ public:
 	}
 	void clear_memory(){
 		for (auto& i: memory){
-			i = 0;
+			i.clear();
 		}		
 	}
 
