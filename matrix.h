@@ -18,8 +18,8 @@ public:
 	}
 	matrix(matrix&& m) : w(m.w), h(m.h), vec(std::move(m.vec)){}
 
-	T get_w() const {return w;}
-	T get_h() const {return h;}
+	const T& get_w() const {return w;}
+	const T& get_h() const {return h;}
 	Type& operator()(const T& x, const T& y) throw(std::exception){
 		return vec[x + y*w];
 	}
