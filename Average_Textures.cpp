@@ -4,6 +4,7 @@
 #include "Average_Textures.h"
 #include <iostream>
 #include <list>
+//#include <set>
 
 
 using namespace std;
@@ -99,16 +100,39 @@ inline list< node > make_neighbors(const node& n, const T& w, const T& h, const 
 	return make_neighbors(n.x, n.y, w, h, neighbors_number);
 }
 
+template<class _T>
+list<_T> move_to_list(vector<_T> &&vec){
+	auto size = vec.size();
+	list<_T> res(size);
+	auto iter = res.begin();
+	for (size_t i = 0; i < size; i++){
+		*iter++ = std::move(vec[i]);
+	}
+	return res;
+}
+template<class _T>
+vector<_T> move_to_vector(list<_T> &&list){
+	auto size = list.size();
+	vector<_T> res(size);
+	auto iter = list.begin();
+	for (size_t i = 0; i < size; i++){
+		res[i] = std::move(*iter++);
+	}
+	return res;
+}
+
 struct info{//информация про узел
 	enum level {NONE = 0, FIRST = 1, SECOND = 2, THIRD = 4};
 private:
-	int used;//использованные уровни
-	int taken;//уровни, взятые в предыдущих соседних узлах.
-	int given;//уровни, которые дали следующие узлы.
+	char used;//использованные уровни
+	char taken;//уровни, взятые в предыдущих соседних узлах.
+	char given;//уровни, которые дали следующие узлы.
 	/*в given будем помещать только уровень, который дал один следующий узел, а в taken все возможные (в соответствии с его описанием см.выше.)*/
 	bool can_be_used_again_;
+	bool edge_of_space;
 	T texture;
-	list< node > valuable_neighbors;
+	vector< node > valuable_neighbors;
+	array<int, 8> memory;
 public:
 	int cur_level;//показывает на каком уровне сейчас стоит 1
 	array< T , 3 > textures;//(значимые только те текстуры, которые отмечены в taken или в given или в cur_level)
@@ -116,7 +140,7 @@ public:
 	
 	static matrix< info >* owner;
 ///////////////////////////////////////////
-	info() : used(NONE), taken(NONE), given(NONE), cur_level(NONE), can_be_used_again_(true){
+	info() : used(NONE), taken(NONE), given(NONE), cur_level(NONE), can_be_used_again_(true), edge_of_space(false){
 		for (size_t i = 0; i < textures.size(); i++) textures[i] = 0;
 	}
 
@@ -126,7 +150,7 @@ public:
 			cerr << "if (!cur_level)" << endl;
 			throw(exception("после отладки программы этот throw надо удалить"));
 		}
-		if (l & (taken | cur_level)){
+		if (l & (taken | (edge_of_space ? given : 0) | cur_level)){
 			if (textures[l/2] != texture) return false/*нельзя добавлять текстуру*/;
 		} else {
 			if(!l){
@@ -135,7 +159,7 @@ public:
 			}
 			textures[l/2] = texture;
 		}
-		given = l;
+		edge_of_space ? given |= l : given = l;
 		return true;
 	}
 	inline bool can_give(const int& l, const T& texture) const{
@@ -183,7 +207,7 @@ public:
 			}
 
 			struct tmp_struct{
-				static bool func(const list< node >& neighbors, const matrix< info >& infos, const T& texture, const level& l){
+				static bool func(const vector< node >& neighbors, const matrix< info >& infos, const T& texture, const level& l){
 					for (const auto& i : neighbors){
 						if (!infos(i.x, i.y).can_give(l, texture)) return false;
 					}
@@ -209,6 +233,7 @@ public:
 			(*owner)(n.x, n.y - 1).give(cur_level, texture);
 		}
 		used |= cur_level;
+		memory[taken] |= cur_level;
 		textures[cur_level / 2] = texture;
 
 		if ((FIRST | SECOND | THIRD) ^ (taken | used)){//какой-то уровень остался и его можно было бы использовать при другой расстановке
@@ -220,23 +245,33 @@ public:
 		return can_be_used_again_;
 	}
 
+	bool was_here(){
+		return memory[taken] & cur_level;
+	}
 
 	void clear(){
-		used = NONE; taken = NONE; given = NONE; cur_level = NONE; can_be_used_again_ = true;
+		used = NONE; taken = NONE; edge_of_space ? 0 : (given = NONE); cur_level = NONE; can_be_used_again_ = true;
 	}
+	void clear_memory(){
+		for (auto& i: memory){
+			i = 0;
+		}		
+	}
+
 	void set_texture(const T& texcure){
 		if (this->texture != texcure){
 			clear();
+			clear_memory();
 			this->texture = texcure;
 		}
 	}
-	inline T get_texture() throw(exception){
+	inline T  get_texture() throw(exception){
 		if (!cur_level) throw(exception("текстура в узле не определена"));
 		return textures[cur_level/2];
 	}
 	void set(const T& texture, const node& n){
 		set_texture(texture); this->n = n;
-		valuable_neighbors = make_neighbors(n, owner->get_w(), owner->get_h(), (neighbor_number)(N1 | N2 | N7 | N8));
+		valuable_neighbors = move_to_vector(make_neighbors(n, owner->get_w(), owner->get_h(), (neighbor_number)(N1 | N2 | N7 | N8)));
 	}
 };
 
@@ -306,6 +341,7 @@ matrix< array<pair<T, bool>, 3> > get_textures_arrangement(const matrix<T>& sour
 			//удалить старые узлы из usable_nodes
 			while (usable_nodes.size() && *usable_nodes.rbegin() < barrier) usable_nodes.pop_back();
 		}
+
 		for (T y = 0; y < h; y++){
 			infos(x, y).clear();
 			try{
@@ -359,26 +395,45 @@ matrix< array<pair<T, bool>, 3> > get_textures_arrangement(const matrix<T>& sour
 
 #include <stdlib.h>
 #include <time.h>
-#include <set>
+//#include <set>
+#include <map>
 
 //изменить в матрицу, которая может иметь решение
 void change_to_matrix_that_may_be_parsed_to_res(matrix< T >& res){
-	set< T > textures;
+	map< T , int > textures;
 	list< node > neighbors;
 	T w = res.get_w(), h = res.get_h();
+	T texture1, texture2;
+	int min, max;
 	for (T x = 1; x < w; x++){
 		textures.clear();
 		for (T y = 0; y < h; y++){
-			neighbors = make_neighbors(x, y, w, h, (neighbor_number)(N1 | N2 | N7 | N8));
+			neighbors = make_neighbors(x, y, w, h);
+			neighbors.push_front(node(x, y));
 			for (const auto& i : neighbors){
-				textures.insert(res(i.x, i.y));
+				textures[res(i.x, i.y)] += 1;
 			}
-			if (textures.size() == 4){
-				textures.erase(res(x, y - 1));
-				res(x, y - 1) = res(x - 1, y);
+			max = 0;
+			for (const auto& i : textures){
+				if (i.second > max){
+					max = i.second;
+					texture1 = i.first;
+				}
 			}
-			if (textures.size() == 3 && !textures.count(res(x, y)))
-				res(x, y) = res(x - 1, y);
+			while (textures.size() > 3){
+				min = max;
+				for (const auto& i : textures){
+					if (i.second <= min && i.first != texture1){
+						min = i.second;
+						texture2 = i.first;
+					}
+				}
+				textures.erase(texture2);
+			}
+
+			for (const auto& i : neighbors){
+				if (!textures.count(res(i.x, i.y))) res(i.x, i.y) = texture1;
+			}
 		}
 	}
 }

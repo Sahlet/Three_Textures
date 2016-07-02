@@ -64,42 +64,54 @@ void print(const matrix< array<pair<T, bool>, 3> >& res){
 }
 
 int main(){
-	const T w = 6, h = 4;
-	//T arr[w * h] = {
-	//	3, 3, 3, 1,
-	//	3, 2, 2, 1,
-	//	3, 2, 2, 1,
-	//	0, 0, 0, 0
+	const T w = 1000, h = 10;
+	////T arr[w * h] = {
+	////	3, 3, 3, 1,
+	////	3, 2, 2, 1,
+	////	3, 2, 2, 1,
+	////	0, 0, 0, 0
+	////};
+	////T arr[w * h] = {
+	////	0, 0, 0, 0,
+	////	1, 1, 1, 2,
+	////	1, 1, 1, 2,
+	////	2, 2, 2, 2,
+	////	3, 3, 3, 3
+	////};
+	////T arr[w * h] = {
+	////	3, 3, 3, 0, 0, 4,
+	////	3, 2, 2, 2, 2, 4,
+	////	3, 2, 2, 2, 2, 4,
+	////	1, 1, 1, 0, 0, 4
+	////};
+	////T arr[w * h] = {
+	////	1, 1, 1, 1, 1,
+	////	1, 1, 1, 1, 1,
+	////	1, 1, 1, 1, 1,
+	////	1, 1, 1, 1, 1,
+	////	1, 1, 1, 1, 1,
+	////	1, 1, 1, 1, 1,
+	////	2, 1, 1, 1, 1,
+	////	3, 4, 1, 1, 1,
+	////	1, 1, 1, 2, 3,
+	////	1, 1, 1, 1, 4
 	//};
-	//T arr[w * h] = {
-	//	0, 0, 0, 0,
-	//	1, 1, 1, 2,
-	//	1, 1, 1, 2,
-	//	2, 2, 2, 2,
-	//	3, 3, 3, 3
-	//};
-	T arr[w * h] = {
-		3, 3, 3, 0, 0, 4,
-		3, 2, 2, 2, 2, 4,
-		3, 2, 2, 2, 2, 4,
-		1, 1, 1, 0, 0, 4
-	};
-	//T arr[w * h] = {
-	//	3, 3, 3, 1, 0,
-	//	3, 2, 4, 1, 3,
-	//	4, 2, 2, 1, 2,
-	//	0, 0, 4, 4, 4,
-	//	0, 0, 1, 4, 3
-	//};
-	vector<T> vec(arr, (T*)((char*)arr + sizeof(arr)));
-	matrix<T> source(w, h);
-	auto iter = vec.begin();
-	for (auto i = source.begin(), end = source.end(); i != end; i++) *i = *iter++;
+	////T arr[w * h] = {
+	////	3, 3, 3, 1, 0,
+	////	3, 2, 4, 1, 3,
+	////	4, 2, 2, 1, 2,
+	////	0, 0, 4, 4, 4,
+	////	0, 0, 1, 4, 3
+	////};
+	//vector<T> vec(arr, (T*)((char*)arr + sizeof(arr)));
+	//matrix<T> source(w, h);
+	//auto iter = vec.begin();
+	//for (auto i = source.begin(), end = source.end(); i != end; i++) *i = *iter++;
 
 	////////////////////////////////////////////////////////
 
 	//matrix<T> source = res_to_source(gen_solution_data(w, h, 10));
-	//matrix<T> source = gen_sourse_data(w, h, 5);
+	matrix<T> source = gen_sourse_data(w, h, 5);
 
 	////////////////////////////////////////////////////////	
 	
@@ -108,7 +120,7 @@ int main(){
 
 	auto diff = difference(source, res_to_source(res));
 	cout << "difference is " << diff << " = " << (diff / (float)(w * h)) * 100 << "%" << endl << endl;
-	print(source, res);
+	//print(source, res);
 
 	system("pause");
 }
