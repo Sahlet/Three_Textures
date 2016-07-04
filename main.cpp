@@ -64,7 +64,7 @@ void print(const matrix< array<pair<T, bool>, 3> >& res){
 }
 
 int main(){
-	const T w = 1000, h = 10;
+	const T w = 40, h = 40;
 	////T arr[w * h] = {
 	////	3, 3, 3, 1,
 	////	3, 2, 2, 1,
@@ -95,7 +95,7 @@ int main(){
 	////	3, 4, 1, 1, 1,
 	////	1, 1, 1, 2, 3,
 	////	1, 1, 1, 1, 4
-	//};
+	////};
 	////T arr[w * h] = {
 	////	3, 3, 3, 1, 0,
 	////	3, 2, 4, 1, 3,
@@ -110,8 +110,8 @@ int main(){
 
 	////////////////////////////////////////////////////////
 
-	//matrix<T> source = res_to_source(gen_solution_data(w, h, 10));
-	matrix<T> source = gen_sourse_data(w, h, 5);
+	matrix<T> source = res_to_source(gen_solution_data(w, h, 10));
+	//matrix<T> source = gen_sourse_data(w, h, 5);
 
 	////////////////////////////////////////////////////////	
 	
