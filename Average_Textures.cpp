@@ -32,7 +32,7 @@ struct node{
 	inline bool operator>(const node& n) const {
 		return !(*this == n || *this < n);
 	}
-	inline T distance(const node& n){
+	inline T distance(const node& n) const {
 		return max((x > n.x ? x - n.x : n.x - x), (y > n.y ? y - n.y : n.y - y));
 	}
 };
@@ -389,34 +389,40 @@ static matrix< array<pair<T, bool>, 3> > get_textures_arrangement(const matrix<T
 		matrix<info> m;//хранит
 		node n;//целевой узел
 		list<node> usable_nodes/*еще могут менять уровень*/;
-		sub_matrix(const node& barrier, const matrix<info> infos, const node& n_, const T& max_distance, const T& max_count_of_usable) : m(1, 1){
+		sub_matrix(const node& barrier, const matrix<info> infos, const node& n_, T max_distance, const T& max_count_of_usable) : m(1, 1){
 			T size = 0, count_of_usable = 0, max_x = infos.get_w() - 1, max_y = infos.get_h() - 1;
-			//max_distance = max(max_distance, max(n.x, n.y));
-			node n1, n2, *n_ptr, LU_point(n_.x - min(1 + max_distance, int(n_.x)), n_.y - min(1 + max_distance, int(n_.y)));
-			m = matrix<info>(min(1 + max_distance, int(n_.x)) + min(1 + max_distance, max_x - n_.x), min(1 + max_distance, (int)n_.y) + min(1 + max_distance, max_y - n_.y));
-			
+			max_distance = min(max_distance, max(n.x, n.y));
+			node n1, n2, *n_ptr, LU_point(n_.x - min(1 + max_distance, int(n_.x)), n_.y - min(1 + max_distance, int(n_.y))), tmp;
+			m = matrix<info>(min(1 + max_distance, int(n_.x)) + min(1 + max_distance, max_x - n_.x), 1 + /*этот + 1 тут надо, а в первом аргументе он не надо*/min(1 + max_distance, (int)n_.y) + min(1 + max_distance, max_y - n_.y));
 			T new_w = m.get_w(), new_h = m.get_h();
-			max_x = m.get_w() - 1;
-			max_y = m.get_h() - 1;
 			n = node(n_.x - LU_point.x, n_.y - LU_point.y);
-			for (T x = 0; x < new_w; x++){
-				for (T y = 0; y < new_h; y++){
-					m(x, y) = infos(LU_point.x + x, LU_point.y + y);
+
+			T diagonals_number = n.x + n.y + 1, x, y;
+			for (T diagonal = 1; diagonal <= diagonals_number; diagonal++){
+				if (diagonal < new_h){
+					y = diagonal;
+					x = 0;
+				} else {
+					y = new_h;
+					x = diagonal - new_h;
+				}
+				for (; y-- > 0; x++){
+					(m(x, y) = infos(LU_point.x + x, LU_point.y + y)).set(node(x, y), m);
 				}
 			}
 
-			barrier = 
-
 			for (T distance = 1; distance <= max_distance && usable_nodes.size() < max_count_of_usable; distance++){
-				n1.y = min((T)(n.y + distance), max_y);
-				n1.x = n.x - distance;
-				n2.y = n.y - distance;
-				n2.x = n.x;
+				n1.y = min((T)(n_.y + distance), max_y);
+				n1.x = (n_.x >= distance) ? n_.x - distance : n1.y = 0;
+				n2.x = n_.x;
+				n2.y = (n_.y >= distance) ? n_.y - distance : n2.x = 0;
 				n_ptr = n1 > n2 ? &n1 : &n2;
 				while (n_ptr->distance(n) == distance && *n_ptr > barrier && usable_nodes.size() < max_count_of_usable){
 				//while (n_ptr->distance(n) == distance && /**n_ptr > barrier && */usable_nodes.size() < max_count_of_usable){
-					m(n_ptr->x, n_ptr->y).set(*n_ptr, m);
-					if (m(n_ptr->x, n_ptr->y).can_be_used_again()) usable_nodes.push_back(*n_ptr);
+					tmp.x = n_ptr->x - LU_point.x;
+					tmp.y = n_ptr->y - LU_point.y;
+					//m(tmp.x, tmp.y).set(tmp, m);
+					if (m(tmp.x, tmp.y).can_be_used_again()) usable_nodes.push_back(tmp.x);
 					if (n_ptr == &n1) n_ptr->y--;
 					else n_ptr->x--;
 					n_ptr = n1 > n2 ? &n1 : &n2;
@@ -424,61 +430,87 @@ static matrix< array<pair<T, bool>, 3> > get_textures_arrangement(const matrix<T
 			}
 		}
 		info& operator[](const node& n){return m(n.x, n.y);}
-		void save_to(matrix<info>& infos, const node& n){
-			LU_point(n.x - min(1 + max_distance, int(n.x)), n.y - min(1 + max_distance, int(n.y)));
+		void save_to(matrix<info>& infos, const node& n_){
+			node LU_point(n_.x - n.x, n_.y - n.y);
+			T diagonals_number = n.x + n.y + 1, w = m.get_w(), h = m.get_h(), x, y;
+			for (T diagonal = 1; diagonal <= diagonals_number; diagonal++){
+				if (diagonal < h){
+					y = diagonal;
+					x = 0;
+				} else {
+					y = h;
+					x = diagonal - h;
+				}
+				for (; y-- > 0; x++){
+					(infos(LU_point.x + x, LU_point.y + y) = m(x, y)).set(node(LU_point.x + x, LU_point.y + y), infos);
+				}
+			}
 		}
 	};
 	
-	auto solve_the_problem = [] (sub_matrix& m) -> bool{
-		//list<info> buffer/*хранит лучший варифнт*/;
-		
-		//if (infos(x, y).can_be_used_again()) usable_nodes.push_front(node(x, y));
-		
-		node curent_usable;
+	struct funcs{
 
-		for (T distance = 1; distance <= max_distance && n < barrier; distance++){
-	//for (; distance_to_start < diagonals_number; diagonals_number++){
-	//	if (distance_to_start < h){
-	//		y = distance_to_start + 1;
-	//		x = 0;
-	//	} else {
-	//		y = h;
-	//		x = distance_to_start - h;
-	//	}
-	//	for (; y-- > 0; x++){
-	//		try{
-	//			infos(x, y).use();
-	//		} catch(const exception&) {
-	//			if (!solve_the_problem(MAX_DISTANCE, node(x, y))){
-	//				infos(x, y).set_texture(infos(x - 1, y).texture);
-	//				infos(x, y).use();
-	//				for (int x_ = (int)x - 2; x_ <= x + 2; x_++){
-	//					for (int y_ = (int)y - 2; y_ <= y + 2; y_++){
-	//						if (x_ >= 0 && y_ >= 0){
-	//							if (infos(x_, y_).free){
-	//								infos(x_, y_).free = false;//это удалять нельзя
-	//								if (node(x_, y_) < node(x, y)){
-	//									//этот код, как мне кажется, не должен никогда выполниться
-	//									cerr << "if (node(x_, y_) < node(x, y))" << endl;
-	//									throw(exception("после отладки программы этот throw надо удалить"));
-	//								}
-	//							}
-	//						}
-	//					}
-	//				}
-	//			} else {barrier = node(x, y);}
-	//		}
-	//	}
-	//}
+		static bool fill_infos(matrix<info>& infos, const node& start, const node& end){
+			T w = infos.get_w(), h = infos.get_h();
+			node barrier;//за этот барьер нельзя заступать
+			T diagonals_number = end.x + end.y + 1, diagonal = 1, x, y;
+
+			for (; diagonal <= diagonals_number; diagonal++){
+				if (diagonal < h){
+					y = diagonal;
+					x = 0;
+				} else {
+					y = h;
+					x = diagonal - h;
+				}
+				for (; y-- > 0; x++){
+					try{
+						infos(x, y).use();
+						} catch(const exception&) {
+						sub_matrix sub_(barrier, infos, node(x, y), MAX_DISTANCE, MAX_COUNT_OF_USABLE);
+						if (!funcs::solve_the_problem(sub_)){
+							infos(x, y).set_texture(infos(x - 1, y).texture);
+							infos(x, y).use();
+							for (int x_ = (int)x - 2; x_ <= x + 2; x_++){
+								for (int y_ = (int)y - 2; y_ <= y + 2; y_++){
+									if (x_ >= 0 && y_ >= 0){
+										if (infos(x_, y_).free){
+											infos(x_, y_).free = false;//это удалять нельзя
+											if (node(x_, y_) < node(x, y)){
+												//этот код, как мне кажется, не должен никогда выполниться
+												cerr << "if (node(x_, y_) < node(x, y))" << endl;
+												throw(exception("после отладки программы этот throw надо удалить"));
+											}
+										}
+									}
+								}
+							}
+						} else {
+							sub_.save_to(infos, node(x, y));
+							barrier = node(x, y);
+						}
+					}
+				}
+			}
 		}
-		return false;
+
+		static bool solve_the_problem (sub_matrix& m){
+			T distance;
+			for (const node& curent_usable : m.usable_nodes){
+				distance = curent_usable.distance(m.n);
+				if (distance > 2){
+
+				}
+			}
+			return false;
+		}
 	};
 
-	T diagonals_number = w + h - 1, diagonal = 0, x, y;
+	T diagonals_number = w + h - 1, diagonal = 1, x, y;
 
-	for (; diagonal < diagonals_number; diagonals_number++){
+	for (; diagonal <= diagonals_number; diagonal++){
 		if (diagonal < h){
-			y = diagonal + 1;
+			y = diagonal;
 			x = 0;
 		} else {
 			y = h;
@@ -488,7 +520,8 @@ static matrix< array<pair<T, bool>, 3> > get_textures_arrangement(const matrix<T
 			try{
 				infos(x, y).use();
 			} catch(const exception&) {
-				if (!solve_the_problem(MAX_DISTANCE, node(x, y))){
+				sub_matrix sub_(barrier, infos, node(x, y), MAX_DISTANCE, MAX_COUNT_OF_USABLE);
+				if (!funcs::solve_the_problem(sub_)){
 					infos(x, y).set_texture(infos(x - 1, y).texture);
 					infos(x, y).use();
 					for (int x_ = (int)x - 2; x_ <= x + 2; x_++){
@@ -505,7 +538,10 @@ static matrix< array<pair<T, bool>, 3> > get_textures_arrangement(const matrix<T
 							}
 						}
 					}
-				} else {barrier = node(x, y);}
+				} else {
+					sub_.save_to(infos, node(x, y));
+					barrier = node(x, y);
+				}
 			}
 		}
 	}
