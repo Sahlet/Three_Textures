@@ -19,18 +19,21 @@ struct node{
 	inline operator pair< T , T >(){
 		return pair< T , T >(x, y);
 	}
-	inline bool operator<(const node& n){
-		if ((x + y < n.x + n.y) || ((x + y == n.x + n.y) && (y < n.y))) return true;
+	inline bool operator<(const node& n) const {
+		if ((x + y < n.x + n.y) || ((x + y == n.x + n.y) && (y > n.y))) return true;
 		return false;
 	}
-	inline bool operator==(const node& n){
+	inline bool operator==(const node& n) const {
 		return y == n.y && x == n.x;
 	}
-	inline bool operator!=(const node& n){
+	inline bool operator!=(const node& n) const {
 		return !(*this == n);
 	}
-	inline bool operator>(const node& n){
+	inline bool operator>(const node& n) const {
 		return !(*this == n || *this < n);
+	}
+	inline T distance(const node& n){
+		return max((x > n.x ? x - n.x : n.x - x), (y > n.y ? y - n.y : n.y - y));
 	}
 };
 
@@ -162,6 +165,7 @@ class info{//информация про узел
 	enum level : char {NONE = 0, FIRST = 1, SECOND = 2, THIRD = 4};
 	static const T max_T;
 	static const T MAX_DISTANCE;
+	static const T MAX_COUNT_OF_USABLE;
 	char used;//использованные уровни
 	char taken;//уровни, взятые в предыдущих соседних узлах.
 	char given;//уровни, которые дали следующие узлы.
@@ -307,8 +311,7 @@ private:
 			this->texture = texcure;
 		}
 	}
-	void set(const T& texture, const node& n, matrix<info>& owner){
-		set_texture(texture);
+	void set(const node& n, matrix<info>& owner){
 		auto tmp_list = make_neighbors(n, owner.get_w(), owner.get_h(), (neighbor_number)(N1 | N2 | N7 | N8));
 		valuable_neighbors = vector<info*>(tmp_list.size());
 		auto iter = tmp_list.begin();
@@ -316,7 +319,13 @@ private:
 			valuable_neighbors[i] = &owner(iter->x, iter->y);
 		}
 		if (n.x && n.y < owner.get_h() - 1) pred_neighbor = &owner(n.x - 1, n.y + 1);
-
+	}
+	void set(const T& texture, const node& n, matrix<info>& owner){
+		set_texture(texture);
+		set(n, owner);
+	}
+	void set_and_check_on_free(const T& texture, const node& n, matrix<info>& owner){
+		set(texture, n, owner);
 		this->free = true;
 		for (int x_ = (int)n.x - 2; x_ <= n.x + 2; x_++){
 			for (int y_ = (int)n.y - 2; y_ <= n.y + 2; y_++){
@@ -372,26 +381,108 @@ static matrix< array<pair<T, bool>, 3> > get_textures_arrangement(const matrix<T
 	//инициализация
 	for (T x = 0; x < w; x++){
 		for (T y = 0; y < h; y++){
-			infos(x, y).set(source(x, y), node(x, y), infos);
+			infos(x, y).set_and_check_on_free(source(x, y), node(x, y), infos);
 		}
 	}
-	
-	auto solve_the_problem = [&infos, &barrier] (const T& distance, const node& n) -> bool{
+
+	struct sub_matrix{
+		matrix<info> m;//хранит
+		node n;//целевой узел
 		list<node> usable_nodes/*еще могут менять уровень*/;
+		sub_matrix(const node& barrier, const matrix<info> infos, const node& n_, const T& max_distance, const T& max_count_of_usable) : m(1, 1){
+			T size = 0, count_of_usable = 0, max_x = infos.get_w() - 1, max_y = infos.get_h() - 1;
+			//max_distance = max(max_distance, max(n.x, n.y));
+			node n1, n2, *n_ptr, LU_point(n_.x - min(1 + max_distance, int(n_.x)), n_.y - min(1 + max_distance, int(n_.y)));
+			m = matrix<info>(min(1 + max_distance, int(n_.x)) + min(1 + max_distance, max_x - n_.x), min(1 + max_distance, (int)n_.y) + min(1 + max_distance, max_y - n_.y));
+			
+			T new_w = m.get_w(), new_h = m.get_h();
+			max_x = m.get_w() - 1;
+			max_y = m.get_h() - 1;
+			n = node(n_.x - LU_point.x, n_.y - LU_point.y);
+			for (T x = 0; x < new_w; x++){
+				for (T y = 0; y < new_h; y++){
+					m(x, y) = infos(LU_point.x + x, LU_point.y + y);
+				}
+			}
+
+			barrier = 
+
+			for (T distance = 1; distance <= max_distance && usable_nodes.size() < max_count_of_usable; distance++){
+				n1.y = min((T)(n.y + distance), max_y);
+				n1.x = n.x - distance;
+				n2.y = n.y - distance;
+				n2.x = n.x;
+				n_ptr = n1 > n2 ? &n1 : &n2;
+				while (n_ptr->distance(n) == distance && *n_ptr > barrier && usable_nodes.size() < max_count_of_usable){
+				//while (n_ptr->distance(n) == distance && /**n_ptr > barrier && */usable_nodes.size() < max_count_of_usable){
+					m(n_ptr->x, n_ptr->y).set(*n_ptr, m);
+					if (m(n_ptr->x, n_ptr->y).can_be_used_again()) usable_nodes.push_back(*n_ptr);
+					if (n_ptr == &n1) n_ptr->y--;
+					else n_ptr->x--;
+					n_ptr = n1 > n2 ? &n1 : &n2;
+				}
+			}
+		}
+		info& operator[](const node& n){return m(n.x, n.y);}
+		void save_to(matrix<info>& infos, const node& n){
+			LU_point(n.x - min(1 + max_distance, int(n.x)), n.y - min(1 + max_distance, int(n.y)));
+		}
+	};
+	
+	auto solve_the_problem = [] (sub_matrix& m) -> bool{
 		//list<info> buffer/*хранит лучший варифнт*/;
+		
 		//if (infos(x, y).can_be_used_again()) usable_nodes.push_front(node(x, y));
+		
+		node curent_usable;
+
+		for (T distance = 1; distance <= max_distance && n < barrier; distance++){
+	//for (; distance_to_start < diagonals_number; diagonals_number++){
+	//	if (distance_to_start < h){
+	//		y = distance_to_start + 1;
+	//		x = 0;
+	//	} else {
+	//		y = h;
+	//		x = distance_to_start - h;
+	//	}
+	//	for (; y-- > 0; x++){
+	//		try{
+	//			infos(x, y).use();
+	//		} catch(const exception&) {
+	//			if (!solve_the_problem(MAX_DISTANCE, node(x, y))){
+	//				infos(x, y).set_texture(infos(x - 1, y).texture);
+	//				infos(x, y).use();
+	//				for (int x_ = (int)x - 2; x_ <= x + 2; x_++){
+	//					for (int y_ = (int)y - 2; y_ <= y + 2; y_++){
+	//						if (x_ >= 0 && y_ >= 0){
+	//							if (infos(x_, y_).free){
+	//								infos(x_, y_).free = false;//это удалять нельзя
+	//								if (node(x_, y_) < node(x, y)){
+	//									//этот код, как мне кажется, не должен никогда выполниться
+	//									cerr << "if (node(x_, y_) < node(x, y))" << endl;
+	//									throw(exception("после отладки программы этот throw надо удалить"));
+	//								}
+	//							}
+	//						}
+	//					}
+	//				}
+	//			} else {barrier = node(x, y);}
+	//		}
+	//	}
+	//}
+		}
 		return false;
 	};
 
-	T diagonals_number = w + h - 1, distance_to_start = 0, x, y;
+	T diagonals_number = w + h - 1, diagonal = 0, x, y;
 
-	for (; distance_to_start < diagonals_number; diagonals_number++){
-		if (distance_to_start < h){
-			y = distance_to_start + 1;
+	for (; diagonal < diagonals_number; diagonals_number++){
+		if (diagonal < h){
+			y = diagonal + 1;
 			x = 0;
 		} else {
 			y = h;
-			x = distance_to_start - h;
+			x = diagonal - h;
 		}
 		for (; y-- > 0; x++){
 			try{
@@ -495,6 +586,7 @@ static matrix< array<pair<T, bool>, 3> > gen_solution_data(const T& w, const T& 
 
 const T info::max_T = 0u - 1;
 const T info::MAX_DISTANCE = 5;
+const T info::MAX_COUNT_OF_USABLE = 15;
 
 matrix< T > res_to_source(const  matrix< array<pair<T, bool>, 3> >& res){
 	auto w = res.get_w(), h = res.get_h();
