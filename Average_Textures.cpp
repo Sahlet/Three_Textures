@@ -375,7 +375,6 @@ public:
 
 static matrix< array<pair<T, bool>, 3> > get_textures_arrangement(const matrix<T>& source) {
 	T w = source.get_w(), h = source.get_h();
-	node barrier;//за этот барьер нельзя заступать
 	matrix< info > infos(w, h);
 
 	//инициализация
@@ -450,10 +449,10 @@ static matrix< array<pair<T, bool>, 3> > get_textures_arrangement(const matrix<T
 	
 	struct funcs{
 
-		static bool fill_infos(matrix<info>& infos, const node& start, const node& end){
+		static bool fill_infos(matrix<info>& infos, const node& start, const node& end, const bool& may_change_texture = false){
 			T w = infos.get_w(), h = infos.get_h();
-			node barrier;//за этот барьер нельзя заступать
-			T diagonals_number = end.x + end.y + 1, diagonal = 1, x, y;
+			node barrier = start, cur;//за этот барьер нельзя заступать
+			T diagonals_number = end.x + end.y + 1, diagonal = 1, &x = cur.x, &y = cur.y;
 
 			for (; diagonal <= diagonals_number; diagonal++){
 				if (diagonal < h){
@@ -463,88 +462,69 @@ static matrix< array<pair<T, bool>, 3> > get_textures_arrangement(const matrix<T
 					y = h;
 					x = diagonal - h;
 				}
-				for (; y-- > 0; x++){
+				for (; y-- > 0 && !(end < cur); x++){
 					try{
 						infos(x, y).use();
-						} catch(const exception&) {
-						sub_matrix sub_(barrier, infos, node(x, y), MAX_DISTANCE, MAX_COUNT_OF_USABLE);
-						if (!funcs::solve_the_problem(sub_)){
-							infos(x, y).set_texture(infos(x - 1, y).texture);
-							infos(x, y).use();
-							for (int x_ = (int)x - 2; x_ <= x + 2; x_++){
-								for (int y_ = (int)y - 2; y_ <= y + 2; y_++){
-									if (x_ >= 0 && y_ >= 0){
-										if (infos(x_, y_).free){
-											infos(x_, y_).free = false;//это удалять нельзя
-											if (node(x_, y_) < node(x, y)){
-												//этот код, как мне кажется, не должен никогда выполниться
-												cerr << "if (node(x_, y_) < node(x, y))" << endl;
-												throw(exception("после отладки программы этот throw надо удалить"));
+					} catch(const exception&) {
+						bool solved = false;
+						if (cur.distance(end) > 2){
+							sub_matrix sub_(barrier, infos, cur, MAX_DISTANCE, MAX_COUNT_OF_USABLE);
+							 if (solved = /*не менять на ==*/ funcs::solve_the_problem(sub_)) {
+								sub_.save_to(infos, node(x, y));
+								barrier = node(x, y);
+							} else if (may_change_texture){
+								infos(x, y).set_texture(infos(x - 1, y).texture);
+								infos(x, y).use();
+								for (int x_ = (int)x - 2; x_ <= x + 2; x_++){
+									for (int y_ = (int)y - 2; y_ <= y + 2; y_++){
+										if (x_ >= 0 && y_ >= 0){
+											if (infos(x_, y_).free){
+												infos(x_, y_).free = false;//это удалять нельзя
+												if (node(x_, y_) < cur){
+													//этот код, как мне кажется, не должен никогда выполниться
+													//тут вообще должно быть исправление infos(x_, y_); его нужно исправить, так как он уже не free (нужно что-то типа infos(x_, y_).use(), но учитывать всех соседе, а не только значимх )
+													cerr << "if (node(x_, y_) < cur)" << endl;
+												}
 											}
 										}
 									}
 								}
+								solved = true;
 							}
-						} else {
-							sub_.save_to(infos, node(x, y));
-							barrier = node(x, y);
+						}
+						
+						if(!solved) {
+							//перебрать варианты
+							
+
+							//if (перебрали и ничего)
+							return false;
 						}
 					}
 				}
 			}
+			return true;
 		}
 
+		//решает проблему с выбором уровня для структуры так, чтоб удовлетворить условиям, которые выполнены с помощью sub_matrix
 		static bool solve_the_problem (sub_matrix& m){
 			T distance;
 			for (const node& curent_usable : m.usable_nodes){
 				distance = curent_usable.distance(m.n);
-				if (distance > 2){
-
+				if (distance <= 2){
+					if (fill_infos(m.m, curent_usable, m.n)) return true;
+					continue;
 				}
+
+
+				//сделать штуки с меморизацией
+				//заполнять соседей-детей и всех, кто нужен, для заполнения детей (стки, поиск в глубину)
 			}
 			return false;
 		}
 	};
 
-	T diagonals_number = w + h - 1, diagonal = 1, x, y;
-
-	for (; diagonal <= diagonals_number; diagonal++){
-		if (diagonal < h){
-			y = diagonal;
-			x = 0;
-		} else {
-			y = h;
-			x = diagonal - h;
-		}
-		for (; y-- > 0; x++){
-			try{
-				infos(x, y).use();
-			} catch(const exception&) {
-				sub_matrix sub_(barrier, infos, node(x, y), MAX_DISTANCE, MAX_COUNT_OF_USABLE);
-				if (!funcs::solve_the_problem(sub_)){
-					infos(x, y).set_texture(infos(x - 1, y).texture);
-					infos(x, y).use();
-					for (int x_ = (int)x - 2; x_ <= x + 2; x_++){
-						for (int y_ = (int)y - 2; y_ <= y + 2; y_++){
-							if (x_ >= 0 && y_ >= 0){
-								if (infos(x_, y_).free){
-									infos(x_, y_).free = false;//это удалять нельзя
-									if (node(x_, y_) < node(x, y)){
-										//этот код, как мне кажется, не должен никогда выполниться
-										cerr << "if (node(x_, y_) < node(x, y))" << endl;
-										throw(exception("после отладки программы этот throw надо удалить"));
-									}
-								}
-							}
-						}
-					}
-				} else {
-					sub_.save_to(infos, node(x, y));
-					barrier = node(x, y);
-				}
-			}
-		}
-	}
+	funcs::fill_infos(infos, node(0, 0), node(infos.get_w() - 1, infos.get_h() - 1), true);
 
 	return infos_to_res(infos);
 }
