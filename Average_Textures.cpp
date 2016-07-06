@@ -5,6 +5,7 @@
 #include <iostream>
 #include <list>
 #include <map>
+#include <functional>
 #include <stdlib.h>
 #include <time.h>
 
@@ -387,17 +388,17 @@ static matrix< array<pair<T, bool>, 3> > get_textures_arrangement(const matrix<T
 
 	struct sub_matrix{
 		matrix<info> m;//хранит
-		node n;//целевой узел
+		node goal;//целевой узел
 		list<node> usable_nodes/*еще могут менять уровень*/;
 		sub_matrix(const node& barrier, const matrix<info> infos, const node& n_, T max_distance, const T& max_count_of_usable) : m(1, 1){
 			T size = 0, count_of_usable = 0, max_x = infos.get_w() - 1, max_y = infos.get_h() - 1;
-			max_distance = min(max_distance, max(n.x, n.y));
+			max_distance = min(max_distance, max(goal.x, goal.y));
 			node n1, n2, *n_ptr, LU_point(n_.x - min(1 + max_distance, int(n_.x)), n_.y - min(1 + max_distance, int(n_.y))), tmp;
 			m = matrix<info>(min(1 + max_distance, int(n_.x)) + min(1 + max_distance, max_x - n_.x), 1 + /*этот + 1 тут надо, а в первом аргументе он не надо*/min(1 + max_distance, (int)n_.y) + min(1 + max_distance, max_y - n_.y));
 			T new_w = m.get_w(), new_h = m.get_h();
-			n = node(n_.x - LU_point.x, n_.y - LU_point.y);
+			goal = node(n_.x - LU_point.x, n_.y - LU_point.y);
 
-			T diagonals_number = n.x + n.y + 1, x, y;
+			T diagonals_number = goal.x + goal.y + 1, x, y;
 			for (T diagonal = 1; diagonal <= diagonals_number; diagonal++){
 				if (diagonal < new_h){
 					y = diagonal;
@@ -411,7 +412,7 @@ static matrix< array<pair<T, bool>, 3> > get_textures_arrangement(const matrix<T
 				}
 			}
 
-			for (T distance = 1; distance <= max_distance && usable_nodes.size() < max_count_of_usable; distance++){
+			for (T distance = 3; distance <= max_distance && usable_nodes.size() < max_count_of_usable; distance++){
 				n1.y = min((T)(n_.y + distance), max_y);
 				n1.x = (n_.x >= distance) ? n_.x - distance : n1.y = 0;
 				n2.x = n_.x;
@@ -423,14 +424,14 @@ static matrix< array<pair<T, bool>, 3> > get_textures_arrangement(const matrix<T
 					if (m(tmp.x, tmp.y).can_be_used_again()) usable_nodes.push_back(tmp);
 					if (n_ptr == &n1) n_ptr->y--;
 					else n_ptr->x--;
-				} while (n_ptr->distance(n) == distance && !(*n_ptr < barrier) && usable_nodes.size() < max_count_of_usable);
-				//} while (n_ptr->distance(n) == distance && /**n_ptr > barrier && */usable_nodes.size() < max_count_of_usable);
+				} while (n_ptr->distance(goal) == distance && !(*n_ptr < barrier) && usable_nodes.size() < max_count_of_usable);
+				//} while (n_ptr->distance(goal) == distance && /**n_ptr > barrier && */usable_nodes.size() < max_count_of_usable);
 			}
 		}
 		info& operator[](const node& n){return m(n.x, n.y);}
 		void save_to(matrix<info>& infos, const node& n_){
-			node LU_point(n_.x - n.x, n_.y - n.y);
-			T diagonals_number = n.x + n.y + 1, w = m.get_w(), h = m.get_h(), x, y;
+			node LU_point(n_.x - goal.x, n_.y - goal.y);
+			T diagonals_number = goal.x + goal.y + 1, w = m.get_w(), h = m.get_h(), x, y;
 			for (T diagonal = 1; diagonal <= diagonals_number; diagonal++){
 				if (diagonal < h){
 					y = diagonal;
@@ -598,15 +599,45 @@ static matrix< array<pair<T, bool>, 3> > get_textures_arrangement(const matrix<T
 		static bool solve_the_problem (sub_matrix& m){
 			T distance;
 			for (const node& curent_usable : m.usable_nodes){
-				distance = curent_usable.distance(m.n);
-				if (distance <= 2){
+				distance = curent_usable.distance(m.goal);
+				matrix<bool> marks(min(distance, m.goal.x) + 1, min(distance, m.goal.y) + min(int(distance), m.m.get_h() - m.goal.y - 1) + 1);
+				node LU_point(m.goal.x - min(distance, m.goal.x), m.goal.y - min(distance, m.goal.y));
+				/*if (distance <= 2){
 					if (fill_infos(m.m, curent_usable, m.n)) return true;
 					continue;
-				}
+				}*/
+
+				m[curent_usable].use();
+				if (!m[curent_usable].can_be_used_again()) m.usable_nodes.pop_front();
+
+				auto predicate = [distance, curent_usable, &m, LU_point, &marks](const node& n)->bool{
+					if (n > curent_usable && m.goal.distance(n) <= distance && !marks.get(n.x - LU_point.x, n.y - LU_point.y)){
+						marks.set(n.x - LU_point.x, n.y - LU_point.y, true);
+						return true;
+					}
+					return false;
+				};
+
+				list<node> edge;
+				auto max_y = m.m.get_h() - 1;
+				std::function<void(const node& n)> rec_func;
+				rec_func = [&rec_func, &edge, &predicate, &m, max_y](const node& n){
+					node tmp;
+					if (n.y > 0 && predicate(tmp = node(n.x, n.y - 1))){
+						rec_func(tmp);
+						edge.push_back(tmp);
+					}
+					if (n.x > 0 && n.y < max_y && predicate(tmp = node(n.x - 1, n.y + 1))){
+						rec_func(tmp);
+						edge.push_back(tmp);
+					}
+				};
+
+				//мы имеем edge, его нужно пробижаться ...
 
 
 				//сделать штуки с меморизацией
-				//заполнять соседей-детей и всех, кто нужен, для заполнения детей (стки, поиск в глубину)
+				//заполнять соседей-детей и всех, кто нужен, для заполнения детей (стеки, поиск в глубину...)
 			}
 			return false;
 		}

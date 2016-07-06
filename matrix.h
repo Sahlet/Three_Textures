@@ -23,6 +23,12 @@ public:
 	Type& operator()(const T& x, const T& y) throw(std::exception){
 		return vec[x + y*w];
 	}
+	void set (const T& x, const T& y, const Type& obj) throw(std::exception){
+		vec[x + y*w] = obj;
+	}
+	Type get (const T& x, const T& y) throw(std::exception){
+		return vec[x + y*w];
+	}
 	const Type& operator()(const T& x, const T& y) const throw(std::exception){
 		return vec[x + y*w];
 	}
