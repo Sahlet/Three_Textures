@@ -46,18 +46,18 @@ list< node > make_neighbors(const T& x, const T& y, const T& w, const T& h){
 			((x + 1 < w) << 3) );
 
 	list< node > neighbors;
+	if (limitless & limits::UP){
+		neighbors.push_back(node(x, y - 1));
+		if (limitless & limits::LEFT) neighbors.push_back(node(x - 1, y - 1));
+		if (limitless & limits::RIGHT) neighbors.push_back(node(x + 1, y - 1));
+	}
+	if (limitless & limits::RIGHT) neighbors.push_back(node(x + 1, y));
 	if (limitless & limits::DOWN){
 		neighbors.push_back(node(x, y + 1));
 		if (limitless & limits::RIGHT) neighbors.push_back(node(x + 1, y + 1));
 		if (limitless & limits::LEFT) neighbors.push_back(node(x - 1, y + 1));
 	}
-	if (limitless & limits::RIGHT) neighbors.push_back(node(x + 1, y));
 	if (limitless & limits::LEFT) neighbors.push_back(node(x - 1, y));
-	if (limitless & limits::UP){
-		neighbors.push_back(node(x, y - 1));
-		if (limitless & limits::RIGHT) neighbors.push_back(node(x + 1, y - 1));
-		if (limitless & limits::LEFT) neighbors.push_back(node(x - 1, y - 1));
-	}
 	
 	return neighbors;
 }
@@ -73,6 +73,7 @@ inline list< node > make_neighbors(const node& n, const T& w, const T& h){
 		7 6 5
 */
 enum neighbor_number {N1 = 1, N2 = 2, N3 = 4, N4 = 8, N5 = 16, N6 = 32, N7 = 64, N8 = 128};
+//приходит список соседей в порядке по часовой стрелке начиная с первого
 list< node > make_neighbors(const T& x, const T& y, const T& w, const T& h, const neighbor_number& neighbors_number){
 	limits limitless = (limits)(
 			(y > 0) | 
@@ -81,18 +82,18 @@ list< node > make_neighbors(const T& x, const T& y, const T& w, const T& h, cons
 			((x + 1 < w) << 3) );
 
 	list< node > neighbors;
+	if (limitless & limits::UP){
+		if (neighbors_number & neighbor_number::N2) neighbors.push_back(node(x, y - 1));
+		if (neighbors_number & neighbor_number::N1 && limitless & limits::LEFT) neighbors.push_back(node(x - 1, y - 1));
+		if (neighbors_number & neighbor_number::N3 && limitless & limits::RIGHT) neighbors.push_back(node(x + 1, y - 1));
+	}
+	if (neighbors_number & neighbor_number::N4 && limitless & limits::RIGHT) neighbors.push_back(node(x + 1, y));
 	if (limitless & limits::DOWN){
 		if (neighbors_number & neighbor_number::N6) neighbors.push_back(node(x, y + 1));
 		if (neighbors_number & neighbor_number::N5 && limitless & limits::RIGHT) neighbors.push_back(node(x + 1, y + 1));
 		if (neighbors_number & neighbor_number::N7 && limitless & limits::LEFT) neighbors.push_back(node(x - 1, y + 1));
 	}
-	if (neighbors_number & neighbor_number::N4 && limitless & limits::RIGHT) neighbors.push_back(node(x + 1, y));
 	if (neighbors_number & neighbor_number::N8 && limitless & limits::LEFT) neighbors.push_back(node(x - 1, y));
-	if (limitless & limits::UP){
-		if (neighbors_number & neighbor_number::N2) neighbors.push_back(node(x, y - 1));
-		if (neighbors_number & neighbor_number::N3 && limitless & limits::RIGHT) neighbors.push_back(node(x + 1, y - 1));
-		if (neighbors_number & neighbor_number::N1 && limitless & limits::LEFT) neighbors.push_back(node(x - 1, y - 1));
-	}
 	
 	return neighbors;
 }
@@ -170,7 +171,7 @@ class info{//информация про узел
 	char taken;//уровни, взятые в предыдущих соседних узлах.
 	char given;//уровни, которые дали следующие узлы.
 	/*в given будем помещать только уровень, который дал один следующий узел, а в taken все возможные (в соответствии с его описанием см.выше.)*/
-	bool can_be_used_again_;
+	bool can_be_used_again_, depends_on_the_next_neighbor;
 	T texture;
 
 	vector< info* > valuable_neighbors;
@@ -184,7 +185,7 @@ class info{//информация про узел
 
 ///////////////////////////////////////////
 public:
-	info() : free(false), pred_neighbor(nullptr), texture(max_T){
+	info() : free(false), pred_neighbor(nullptr), texture(max_T), depends_on_the_next_neighbor(false){
 		clear();
 	}
 private:
@@ -311,14 +312,14 @@ private:
 			this->texture = texcure;
 		}
 	}
-	void set(const node& n, matrix<info>& owner){
-		auto tmp_list = make_neighbors(n, owner.get_w(), owner.get_h(), (neighbor_number)(N1 | N2 | N7 | N8));
+	void set(const node& n, matrix<info>& owner, const bool& depends_on_the_next_neighbor = false){
+		auto tmp_list = make_neighbors(n, owner.get_w(), owner.get_h(), neighbor_number((this->depends_on_the_next_neighbor = /*не менять на ==*/ depends_on_the_next_neighbor) ? (N1 | N2 | N3 | N7 | N8) : (N1 | N2 | N7 | N8)));
 		valuable_neighbors = vector<info*>(tmp_list.size());
 		auto iter = tmp_list.begin();
 		for (size_t i = 0; i < valuable_neighbors.size(); i++){
 			valuable_neighbors[i] = &owner(iter->x, iter->y);
 		}
-		if (n.x && n.y < owner.get_h() - 1) pred_neighbor = &owner(n.x - 1, n.y + 1);
+		pred_neighbor = (n.x && n.y < owner.get_h() - 1) ? &owner(n.x - 1, n.y + 1) : nullptr;
 	}
 	void set(const T& texture, const node& n, matrix<info>& owner){
 		set_texture(texture);
@@ -405,7 +406,7 @@ static matrix< array<pair<T, bool>, 3> > get_textures_arrangement(const matrix<T
 					y = new_h;
 					x = diagonal - new_h;
 				}
-				for (; y-- > 0; x++){
+				for (;y-- > 0 && x < new_w; x++){
 					(m(x, y) = infos(LU_point.x + x, LU_point.y + y)).set(node(x, y), m);
 				}
 			}
@@ -415,17 +416,15 @@ static matrix< array<pair<T, bool>, 3> > get_textures_arrangement(const matrix<T
 				n1.x = (n_.x >= distance) ? n_.x - distance : n1.y = 0;
 				n2.x = n_.x;
 				n2.y = (n_.y >= distance) ? n_.y - distance : n2.x = 0;
-				n_ptr = n1 > n2 ? &n1 : &n2;
-				while (n_ptr->distance(n) == distance && *n_ptr > barrier && usable_nodes.size() < max_count_of_usable){
-				//while (n_ptr->distance(n) == distance && /**n_ptr > barrier && */usable_nodes.size() < max_count_of_usable){
+				do{
+					n_ptr = n1 > n2 ? &n1 : &n2;//надо, чтоб было в начале цикла
 					tmp.x = n_ptr->x - LU_point.x;
 					tmp.y = n_ptr->y - LU_point.y;
-					//m(tmp.x, tmp.y).set(tmp, m);
-					if (m(tmp.x, tmp.y).can_be_used_again()) usable_nodes.push_back(tmp.x);
+					if (m(tmp.x, tmp.y).can_be_used_again()) usable_nodes.push_back(tmp);
 					if (n_ptr == &n1) n_ptr->y--;
 					else n_ptr->x--;
-					n_ptr = n1 > n2 ? &n1 : &n2;
-				}
+				} while (n_ptr->distance(n) == distance && !(*n_ptr < barrier) && usable_nodes.size() < max_count_of_usable);
+				//} while (n_ptr->distance(n) == distance && /**n_ptr > barrier && */usable_nodes.size() < max_count_of_usable);
 			}
 		}
 		info& operator[](const node& n){return m(n.x, n.y);}
@@ -440,8 +439,8 @@ static matrix< array<pair<T, bool>, 3> > get_textures_arrangement(const matrix<T
 					y = h;
 					x = diagonal - h;
 				}
-				for (; y-- > 0; x++){
-					(infos(LU_point.x + x, LU_point.y + y) = m(x, y)).set(node(LU_point.x + x, LU_point.y + y), infos);
+				for (;y-- > 0 && x < w; x++){
+					(infos(LU_point.x + x, LU_point.y + y) = m(x, y)).set(node(LU_point.x + x, LU_point.y + y), infos, infos(LU_point.x + x, LU_point.y + y).depends_on_the_next_neighbor);
 				}
 			}
 		}
@@ -449,59 +448,148 @@ static matrix< array<pair<T, bool>, 3> > get_textures_arrangement(const matrix<T
 	
 	struct funcs{
 
-		static bool fill_infos(matrix<info>& infos, const node& start, const node& end, const bool& may_change_texture = false){
-			T w = infos.get_w(), h = infos.get_h();
-			node barrier = start, cur;//за этот барьер нельзя заступать
-			T diagonals_number = end.x + end.y + 1, diagonal = 1, &x = cur.x, &y = cur.y;
+		struct node_saver{
+			node old_n, &n;
+			node_saver(node& n) : n(n), old_n(n){}
+			~node_saver(){
+				n = old_n;
+			}
+		};
 
-			for (; diagonal <= diagonals_number; diagonal++){
-				if (diagonal < h){
-					y = diagonal;
-					x = 0;
+		static bool fill_infos(matrix<info>& infos, node start, const node& goal, const bool& may_change_texture = false){
+			node end(goal.x, min(goal.x + goal.y - start.x, infos.get_h() - 1));
+			node barrier = start;//за этот барьер нельзя заступать
+			node cur = start;
+			T &x = cur.x, &y = cur.y;
+
+			if (start.y > 0)
+			for (x = start.x, y = start.y; x < end.x; x++){
+				infos(x, y).set(cur, infos, true);
+			}
+
+			auto pred = [&start, &end, &cur]()->void{
+				if (cur.x > start.x && cur.y < end.y){
+					cur.x--; cur.y++;
 				} else {
-					y = h;
-					x = diagonal - h;
+					T diagonal = cur.x + cur.y;
+					if (diagonal <= end.x + start.y){
+						cur.y = start.y;
+						cur.x = diagonal - cur.y - 1;
+					} else {
+						cur.x = end.x;
+						cur.y = diagonal - cur.x - 1;
+					}
 				}
-				for (; y-- > 0 && !(end < cur); x++){
-					try{
-						infos(x, y).use();
-					} catch(const exception&) {
-						bool solved = false;
-						if (cur.distance(end) > 2){
-							sub_matrix sub_(barrier, infos, cur, MAX_DISTANCE, MAX_COUNT_OF_USABLE);
-							 if (solved = /*не менять на ==*/ funcs::solve_the_problem(sub_)) {
-								sub_.save_to(infos, node(x, y));
-								barrier = node(x, y);
-							} else if (may_change_texture){
-								infos(x, y).set_texture(infos(x - 1, y).texture);
-								infos(x, y).use();
-								for (int x_ = (int)x - 2; x_ <= x + 2; x_++){
-									for (int y_ = (int)y - 2; y_ <= y + 2; y_++){
-										if (x_ >= 0 && y_ >= 0){
-											if (infos(x_, y_).free){
-												infos(x_, y_).free = false;//это удалять нельзя
-												if (node(x_, y_) < cur){
-													//этот код, как мне кажется, не должен никогда выполниться
-													//тут вообще должно быть исправление infos(x_, y_); его нужно исправить, так как он уже не free (нужно что-то типа infos(x_, y_).use(), но учитывать всех соседе, а не только значимх )
-													cerr << "if (node(x_, y_) < cur)" << endl;
-												}
-											}
-										}
-									}
-								}
-								solved = true;
+			};
+			auto next = [&start, &end, &cur]()->void{
+				if (cur.x < end.x && cur.y > start.y){
+					cur.x++; cur.y--;
+				} else {
+					T diagonal = cur.x + cur.y;
+					if (diagonal < end.y + start.x){
+						cur.x = start.x;
+						cur.y = diagonal - cur.x + 1;
+					} else {
+						cur.y = end.y;
+						cur.x = diagonal - cur.y + 1;
+					}
+				}
+			};
+
+			while (!(goal < cur)){
+				infos(x, y).clear();
+				try{
+					infos(x, y).use();
+					infos(x, y).remember();
+				} catch(const exception&) {
+					bool solved = false;
+					#pragma region try_to_solve
+					{
+						/*тут барьер использовать не надо потому, что маленькая сложность*/
+						node_saver old_start(start);
+						auto problem_node = cur;
+						auto neighbors = make_neighbors(x - old_start.old_n.x, y - old_start.old_n.y, 1 + end.x - old_start.old_n.x, 1 + end.y - old_start.old_n.x, (neighbor_number)(N1 | N2 | N7 | N8));//приходит список соседей в порядке по часовой стрелке начиная с первого
+						if (neighbors.size()){
+							start = node(neighbors.begin()->x + old_start.old_n.x, neighbors.begin()->y + old_start.old_n.y);
+							neighbors = make_neighbors(start.x - old_start.old_n.x, start.y - old_start.old_n.y, 1 + end.x - old_start.old_n.x, 1 + end.y - old_start.old_n.x, (neighbor_number)(N1 | N2 | N7 | N8));//приходит список соседей в порядке по часовой стрелке начиная с первого
+							if (neighbors.size()){
+								start = node(neighbors.begin()->x + old_start.old_n.x, neighbors.begin()->y + old_start.old_n.y);
 							}
 						}
 						
-						if(!solved) {
-							//перебрать варианты
+						node the_most_far_node;
+						list< node > usable_nodes;
+						while(!solved){
+							do{
+								pred();
+								if (infos(x, y).can_be_used_again()) break;
+							} while (cur != start);
 							
+							if (!infos(x, y).can_be_used_again()) break;
 
-							//if (перебрали и ничего)
-							return false;
+							the_most_far_node = cur;
+							infos(x, y).use();//тут exception не вылетит
+							infos(x, y).remember();
+							if (infos(x, y).can_be_used_again()) usable_nodes.push_back(the_most_far_node);
+							while (cur < problem_node){
+								next();
+								infos(x, y).clear();
+								try{
+									infos(x, y).use();
+									infos(x, y).remember();
+									if(infos(x, y).can_be_used_again()) usable_nodes.push_front(cur);
+								} catch(const exception&) {
+									if (usable_nodes.size()){
+										cur = *usable_nodes.begin();
+										infos(x, y).use();
+										infos(x, y).remember();
+										if (!infos(x, y).can_be_used_again()) usable_nodes.pop_front();
+									} else {
+										cur = the_most_far_node;
+										break;
+									}
+								}
+							}
+							if (cur == problem_node) solved = true;
 						}
 					}
+					#pragma endregion
+					
+					if (!solved && cur.distance(start) > 2){
+						sub_matrix sub_(barrier, infos, cur, MAX_DISTANCE, MAX_COUNT_OF_USABLE);
+						if (solved = /*не менять на ==*/ funcs::solve_the_problem(sub_)) {
+							sub_.save_to(infos, node(x, y));
+							barrier = node(x, y);
+						}
+					}
+
+					if (!solved && may_change_texture){
+						if (infos(x, y).depends_on_the_next_neighbor){
+							//этот код, как мне кажется, не должен никогда выполниться
+							cerr << "if (infos(x, y).depends_on_the_next_neighbor)" << endl;
+						}
+						infos(x, y).set_texture(infos(x - 1, y).texture);
+						infos(x, y).use();
+						for (int x_ = (int)x - 2; x_ <= x + 2; x_++){
+							for (int y_ = (int)y - 2; y_ <= y + 2; y_++){
+								if (x_ >= 0 && y_ >= 0){
+									if (infos(x_, y_).free){
+										infos(x_, y_).free = false;//это удалять нельзя
+										if (node(x_, y_) < cur){
+											//этот код, как мне кажется, не должен никогда выполниться
+											//тут вообще должно быть исправление infos(x_, y_); его нужно исправить, так как он уже не free (нужно что-то типа infos(x_, y_).use(), но учитывать всех соседе, а не только значимх )
+											cerr << "if (node(x_, y_) < cur)" << endl;
+										}
+									}
+								}
+							}
+						}
+						solved = true;
+					}
+					
+					if (!solved) return false;
 				}
+				next();
 			}
 			return true;
 		}
