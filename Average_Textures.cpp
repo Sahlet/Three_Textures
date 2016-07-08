@@ -176,8 +176,8 @@ class info{//информация про узел
 	map< array< T , 3 > , char> memory;
 
 	vector< info* > valuable_neighbors;//узлы, от которых зависит этот.
-	vector< info* > giving_neighbors;//узлы, которые моглут давать (дающие) (выполняют give для этого узла).
-	vector< info* > accepting_neighbors;//узлы, которые принимают от этого узла (принимающие).
+	vector< info* > depending_neighbors;//узлы, которые зависят от этого.
+
 public:
 	bool free;//показывает, является ли этот узел таким, что вокруг него много узлов с таким же цветом
 	static const T max_T;
@@ -200,8 +200,7 @@ public:
 		free(inf.free){
 			if (texture == max_T){
 				valuable_neighbors = inf.valuable_neighbors;
-				giving_neighbors = inf.giving_neighbors;
-				accepting_neighbors = inf.accepting_neighbors;
+				depending_neighbors = inf.depending_neighbors;
 			}
 			texture = inf.texture;
 	}
@@ -215,8 +214,7 @@ public:
 		free = inf.free;
 		if (texture == max_T){
 			valuable_neighbors = inf.valuable_neighbors;
-			giving_neighbors = inf.giving_neighbors;
-			accepting_neighbors = inf.accepting_neighbors;
+			depending_neighbors = inf.depending_neighbors;
 		}
 		texture = inf.texture;
 		return *this;
@@ -231,8 +229,7 @@ public:
 		free(inf.free){
 			if (texture == max_T){
 				valuable_neighbors = std::move(inf.valuable_neighbors);
-				giving_neighbors = std::move(inf.giving_neighbors);
-				accepting_neighbors = std::move(inf.accepting_neighbors);
+				depending_neighbors = std::move(inf.depending_neighbors);
 			}
 			texture = inf.texture;
 	}
@@ -246,8 +243,7 @@ public:
 		free = inf.free;
 		if (texture == max_T){
 			valuable_neighbors = std::move(inf.valuable_neighbors);
-			giving_neighbors = std::move(inf.giving_neighbors);
-			accepting_neighbors = std::move(inf.accepting_neighbors);
+			depending_neighbors = std::move(inf.depending_neighbors);
 		}
 		texture = inf.texture;
 		return *this;
@@ -280,10 +276,10 @@ public:
 	void remove_from_the_level(){
 		if (!cur_level) return;
 		bool can_remove_from_this_accepting_neighbor;
-		for (auto i : accepting_neighbors){
-			if ((i->cur_level == cur_level) || !(i->given & cur_level)) continue;
+		for (auto i : valuable_neighbors){
+			if (!(i->given & cur_level)) continue;
 			can_remove_from_this_accepting_neighbor = true;
-			for (auto j : i->giving_neighbors){
+			for (auto j : i->depending_neighbors){
 				if (j != this && j->texture == texture && j->cur_level == cur_level){
 					can_remove_from_this_accepting_neighbor = false;
 					break;
@@ -291,7 +287,7 @@ public:
 			}
 			if (can_remove_from_this_accepting_neighbor){
 				i->given ^= cur_level;
-				i->textures[cur_level/2] = max_T;
+				if (!((i->cur_level == cur_level) || (i->taken & cur_level)))i->textures[cur_level/2] = max_T;
 			}
 		}
 		textures[cur_level/2] = max_T;
@@ -371,7 +367,7 @@ public:
 			throw exception();
 		}
 		
-		for (auto i : accepting_neighbors){
+		for (auto i : valuable_neighbors){
 			i->give(cur_level, texture);
 		}
 
@@ -410,18 +406,11 @@ public:
 			valuable_neighbors[i] = &owner(iter->x, iter->y);
 		}
 
-		neighbors = make_neighbors(n, owner.get_w(), owner.get_h(), neighbor_number(N3 | N4));
-		giving_neighbors = vector<info*>(neighbors.size());
+		neighbors = make_neighbors(n, owner.get_w(), owner.get_h(), neighbor_number(N3 | N4 | N5 | N6));
+		depending_neighbors = vector<info*>(neighbors.size());
 		iter = neighbors.begin();
-		for (size_t i = 0; i < giving_neighbors.size(); i++, iter++){
-			giving_neighbors[i] = &owner(iter->x, iter->y);
-		}
-
-		neighbors = make_neighbors(n, owner.get_w(), owner.get_h(), neighbor_number(N7 | N8));
-		accepting_neighbors = vector<info*>(neighbors.size());
-		iter = neighbors.begin();
-		for (size_t i = 0; i < accepting_neighbors.size(); i++, iter++){
-			accepting_neighbors[i] = &owner(iter->x, iter->y);
+		for (size_t i = 0; i < depending_neighbors.size(); i++, iter++){
+			depending_neighbors[i] = &owner(iter->x, iter->y);
 		}
 	}
 	T get_texture(){ return texture; }
@@ -508,6 +497,39 @@ matrix< array<pair<T, bool>, 3> > get_textures_arrangement(const matrix<T>& sour
 	
 	struct funcs{
 
+		struct next_pred{
+			node& start, &end, &cur;
+			next_pred(node& start, node &end, node &cur) : start(start), end(end), cur(cur){}
+			void pred(){
+				if (cur.x > start.x && cur.y < end.y){
+					cur.x--; cur.y++;
+				} else {
+					T diagonal = cur.x + cur.y;
+					if (diagonal <= end.x + start.y){
+						cur.y = start.y;
+						cur.x = diagonal - cur.y - 1;
+					} else {
+						cur.x = end.x;
+						cur.y = diagonal - cur.x - 1;
+					}
+				}
+			}
+			void next(){
+				if (cur.x < end.x && cur.y > start.y){
+					cur.x++; cur.y--;
+				} else {
+					T diagonal = cur.x + cur.y;
+					if (diagonal < end.y + start.x){
+						cur.x = start.x;
+						cur.y = diagonal - cur.x + 1;
+					} else {
+						cur.y = end.y;
+						cur.x = diagonal - cur.y + 1;
+					}
+				}
+			}
+		};
+
 		struct node_tree {
 			node n;
 			unique_ptr< node_tree > left, right;//правый узел ставше (right < left)
@@ -591,38 +613,10 @@ matrix< array<pair<T, bool>, 3> > get_textures_arrangement(const matrix<T>& sour
 			node cur = start;
 			T &x = cur.x, &y = cur.y;
 
-			auto pred = [&start, &end, &cur]()->void{
-				if (cur.x > start.x && cur.y < end.y){
-					cur.x--; cur.y++;
-				} else {
-					T diagonal = cur.x + cur.y;
-					if (diagonal <= end.x + start.y){
-						cur.y = start.y;
-						cur.x = diagonal - cur.y - 1;
-					} else {
-						cur.x = end.x;
-						cur.y = diagonal - cur.x - 1;
-					}
-				}
-			};
-			auto next = [&start, &end, &cur]()->void{
-				if (cur.x < end.x && cur.y > start.y){
-					cur.x++; cur.y--;
-				} else {
-					T diagonal = cur.x + cur.y;
-					if (diagonal < end.y + start.x){
-						cur.x = start.x;
-						cur.y = diagonal - cur.x + 1;
-					} else {
-						cur.y = end.y;
-						cur.x = diagonal - cur.y + 1;
-					}
-				}
-			};
-
+			next_pred iter(start, end, cur);
 			while (!(goal < cur)){
 				infos(x, y).clear();
-				next();
+				iter.next();
 			}
 			cur = start;
 
@@ -650,37 +644,23 @@ matrix< array<pair<T, bool>, 3> > get_textures_arrangement(const matrix<T>& sour
 							}
 						}
 						
-						node the_most_far_node;
-						list< node > usable_nodes;
+						bool use = false;
 						while(!solved){
 							do{
 								infos(x, y).clear();
-								pred();
-								if (infos(x, y).can_be_used()) break;
+								iter.pred();
+								if (use = infos(x, y).use()){
+									infos(x, y).remember();
+									break;
+								}
 							} while (cur != start);
 							
-							if (!infos(x, y).can_be_used()) break;
+							if (!use) break;
 
-							the_most_far_node = cur;
-							infos(x, y).use();//тут вернет true
-							infos(x, y).remember();
-							if (infos(x, y).can_be_used()) usable_nodes.push_back(the_most_far_node);
 							while (cur < problem_node){
-								next();
-								if (infos(x, y).use()) {
-									infos(x, y).remember();
-									if(infos(x, y).can_be_used()) usable_nodes.push_front(cur);
-								} else {
-									if (usable_nodes.size()){
-										cur = *usable_nodes.begin();
-										infos(x, y).use();
-										infos(x, y).remember();
-										if (!infos(x, y).can_be_used()) usable_nodes.pop_front();
-									} else {
-										cur = the_most_far_node;
-										break;
-									}
-								}
+								iter.next();
+								if (infos(x, y).use()) infos(x, y).remember();
+								else break;
 							}
 							if (cur == problem_node) solved = true;
 						}
@@ -718,7 +698,7 @@ matrix< array<pair<T, bool>, 3> > get_textures_arrangement(const matrix<T>& sour
 					
 					if (!solved) return false;
 				}
-				next();
+				iter.next();
 			}
 			return true;
 		}
@@ -729,13 +709,8 @@ matrix< array<pair<T, bool>, 3> > get_textures_arrangement(const matrix<T>& sour
 			T w = m.m.get_w(), h = m.m.get_h();
 			auto max_y = h - 1, max_x = w - 1;
 			matrix<bool> marks(1, 1);
-			node LU_point;
-			node curent_usable;
-
-			/*
-				где-то тут надо сделать очистку детей узла, чтоб его можно было use
-
-			*/
+			node LU_point, start, end, cur, last = m.goal, curent_usable;
+			next_pred iter(start, end, cur);
 
 			std::function< unique_ptr< node_tree > (const node& n) > build;
 			std::function< bool(node_tree&) > next_use;
@@ -822,6 +797,14 @@ matrix< array<pair<T, bool>, 3> > get_textures_arrangement(const matrix<T>& sour
 						distance = curent_usable.distance(m.goal);
 						marks = matrix<bool>(min(distance, m.goal.x) + 1, min(distance, m.goal.y) + min(int(distance), m.m.get_h() - m.goal.y - 1) + 1);
 						LU_point = node(m.goal.x - min(distance, m.goal.x), m.goal.y - min(distance, m.goal.y));
+
+						/*
+							где-то тут надо сделать очистку детей узла, чтоб его можно было use
+
+							так, чтоб еще правый треугольник очистился, а потом где-то надо еще вставить очистку детей при переходе междк usable_nodes
+						*/
+						iter.start = LU_point;
+						iter.end = ;
 					}
 					
 					{
