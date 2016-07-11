@@ -559,13 +559,13 @@ matrix< array<pair<T, bool>, 3> > get_textures_arrangement(const matrix<T>& sour
 		list< node > usable_nodes/*еще могут менять уровень*/;
 		sub_matrix(const node& barrier, const matrix<info> infos, const node& n_, T max_distance_x, T max_distance_y, const T& max_count_of_usable) : m(1, 1){
 			T size = 0, count_of_usable = 0, max_x = infos.get_w() - 1, max_y = infos.get_h() - 1;
+			node n1, n2, *n_ptr, LU_point(n_.x - min(1 + max_distance_x, int(n_.x)), n_.y - min(1 + max_distance_y, int(n_.y))), tmp;
+			m = matrix<info>(1 + min(max_distance_x, n_.x) + min(max_distance_y, T(max_x - n_.x)), 1 + min(1 + max_distance_y, (int)n_.y) + min(1 + max_distance_x, max_y - n_.y));
+			T new_w = m.get_w(), new_h = m.get_h();
+			goal = node(n_.x - LU_point.x, n_.y - LU_point.y);
 			max_distance_x = min(max_distance_x, goal.x);
 			max_distance_y = min(max_distance_y, goal.y);
 			auto max_distance = max(max_distance_x, max_distance_y);
-			node n1, n2, *n_ptr, LU_point(n_.x - min(1 + max_distance_x, int(n_.x)), n_.y - min(1 + max_distance_y, int(n_.y))), tmp;
-			m = matrix<info>(min(1 + max_distance_x, int(n_.x)) + min(1 + max_distance_y, max_x - n_.x), 1 + /*+ 1 тут надо, а в первом аргументе не надо*/min(1 + max_distance_y, (int)n_.y) + min(1 + max_distance_x, max_y - n_.y));
-			T new_w = m.get_w(), new_h = m.get_h();
-			goal = node(n_.x - LU_point.x, n_.y - LU_point.y);
 
 			T diagonals_number = goal.x + goal.y + 1, x, y;
 			for (T diagonal = 1; diagonal <= diagonals_number; diagonal++){
@@ -640,11 +640,12 @@ matrix< array<pair<T, bool>, 3> > get_textures_arrangement(const matrix<T>& sour
 			while (!(goal < cur)){
 				if (infos(x, y).use()) infos(x, y).remember();
 				else {
+					sub_matrix sub_(barrier, infos, cur, min((int)MAX_DISTANCE, x - start.x), min((int)MAX_DISTANCE, y - start.y), MAX_COUNT_OF_USABLE);
 					bool solved = false;
 					#pragma region try_to_solve
 					{
 						/*тут барьер использовать не надо потому, что маленькая сложность*/
-						node_saver old_start(start);
+						node_saver old_start(start), old_cur(cur);
 						auto problem_node = cur;//прежде чем менять, подумай!(сейчас все ок)
 						auto neighbors = make_neighbors(x - old_start.old_n.x, y - old_start.old_n.y, 1 + end.x - old_start.old_n.x, 1 + end.y - old_start.old_n.x, (neighbor_number)(N1 | N2 | N7 | N8));//приходит список соседей в порядке по часовой стрелке начиная с первого
 						if (neighbors.size()){
@@ -685,7 +686,6 @@ matrix< array<pair<T, bool>, 3> > get_textures_arrangement(const matrix<T>& sour
 					#pragma endregion
 					
 					if (!solved && cur.distance(start) > 2){
-						sub_matrix sub_(barrier, infos, cur, min((int)MAX_DISTANCE, x - start.x), min((int)MAX_DISTANCE, y - start.y), MAX_COUNT_OF_USABLE);
 						if (solved = /*не менять на ==*/ funcs::solve_the_problem(sub_)) {
 							sub_.save_to(infos, node(x, y));
 							barrier = node(x, y);
@@ -753,8 +753,8 @@ matrix< array<pair<T, bool>, 3> > get_textures_arrangement(const matrix<T>& sour
 				//	}\
 				//}
 
-				if (n.y > 0 ) res->right = build(node(n.x, n.y - 1));
-				if (n.x > 0 && n.y < max_y) res->left = build(node(n.x - 1, n.y + 1));
+				if (n.y > 0 && !m.m(n.x, n.y - 1).tag && !(res->right = build(node(n.x, n.y - 1)))) return nullptr;
+				if (n.x > 0 && n.y < max_y && !m.m(n.x - 1, n.y + 1).tag && !(res->left = build(node(n.x - 1, n.y + 1)))) return nullptr;
 				if (!next_use(*res)) return nullptr;
 				return std::move(res);
 			};
@@ -817,6 +817,7 @@ matrix< array<pair<T, bool>, 3> > get_textures_arrangement(const matrix<T>& sour
 					n2.y = (m.goal.y >= last_distance) ? m.goal.y - last_distance : n2.x = 0;
 					do{
 						n_ptr = n1 > n2 ? &n1 : &n2;//надо, чтоб было в начале цикла
+						if (*n_ptr == root_node) break;
 						//
 						//useful code
 						m[*n_ptr].clear();
@@ -824,7 +825,7 @@ matrix< array<pair<T, bool>, 3> > get_textures_arrangement(const matrix<T>& sour
 						//
 						if (n_ptr == &n1) n_ptr->y--;
 						else n_ptr->x--;
-					} while (n_ptr->distance(m.goal) == last_distance && !(*n_ptr == root_node));
+					} while (n_ptr->distance(m.goal) == last_distance);
 				}
 
 
