@@ -181,6 +181,7 @@ class info{//информация про узел
 public:
 	bool free;//показывает, является ли этот узел таким, что вокруг него много узлов с таким же цветом
 	static const T max_T;
+	//void* tag;
 
 ///////////////////////////////////////////
 
@@ -376,8 +377,13 @@ public:
 
 		return true;
 	}
+	bool was_used(){ return bool(used); }
 
 	bool was_here(){
+		if (!used){
+			cerr << "if (!used)" << endl;
+			throw(exception("после отладки программы этот throw надо удалить"));
+		}
 		return memory[textures] & cur_level;
 	}
 	void remember(){		
@@ -546,7 +552,7 @@ matrix< array<pair<T, bool>, 3> > get_textures_arrangement(const matrix<T>& sour
 			max_distance_y = min(max_distance_y, goal.y);
 			auto max_distance = max(max_distance_x, max_distance_y);
 			node n1, n2, *n_ptr, LU_point(n_.x - min(1 + max_distance_x, int(n_.x)), n_.y - min(1 + max_distance_y, int(n_.y))), tmp;
-			m = matrix<info>(min(1 + max_distance_x, int(n_.x)) + min(1 + max_distance_y, max_x - n_.x), 1 + /*этот + 1 тут надо, а в первом аргументе он не надо*/min(1 + max_distance_y, (int)n_.y) + min(1 + max_distance_x, max_y - n_.y));
+			m = matrix<info>(min(1 + max_distance_x, int(n_.x)) + min(1 + max_distance_y, max_x - n_.x), 1 + /*+ 1 тут надо, а в первом аргументе не надо*/min(1 + max_distance_y, (int)n_.y) + min(1 + max_distance_x, max_y - n_.y));
 			T new_w = m.get_w(), new_h = m.get_h();
 			goal = node(n_.x - LU_point.x, n_.y - LU_point.y);
 
@@ -564,7 +570,7 @@ matrix< array<pair<T, bool>, 3> > get_textures_arrangement(const matrix<T>& sour
 				}
 			}
 
-			for (T distance = 3; distance <= max_distance && usable_nodes.size() < max_count_of_usable; distance++){
+			for (T distance = 1; distance <= max_distance && usable_nodes.size() < max_count_of_usable; distance++){
 				n1.y = min((T)(n_.y + distance), max_y);
 				n1.x = (n_.x >= distance) && (distance <= max_distance_x) ? n_.x - distance : n1.y = 0;
 				n2.x = n_.x;
@@ -708,27 +714,42 @@ matrix< array<pair<T, bool>, 3> > get_textures_arrangement(const matrix<T>& sour
 			T distance = 0;
 			T w = m.m.get_w(), h = m.m.get_h();
 			auto max_y = h - 1, max_x = w - 1;
-			matrix<bool> marks(1, 1);
-			node LU_point, start, end, cur, last = m.goal, curent_usable;
+			matrix<char> marks(w, h);
+			node curent_usable;
+			node start, end, cur, last = m.goal;
 			next_pred iter(start, end, cur);
+
+
+			for (T y = 0; y < h; y++){
+				for (T x = 0; x < w; x++){
+					marks.set(x, y, 1);
+				}
+			}
 
 			std::function< unique_ptr< node_tree > (const node& n) > build;
 			std::function< bool(node_tree&) > next_use;
-			std::function< bool(node_tree&) > add_to_usable_nodes;
+			std::function< void/*bool*/(node_tree&) > add_to_usable_nodes;
 			std::function< void(node_tree&) > remember_all;
 			std::function< void(node_tree&) > clear_all;
-			//build = [&m, &marks, &max_y, &next_use, &LU_point, &distance, &curent_usable, &build](const node& n) throw(exception) -> unique_ptr< node_tree >{
 			build = [&](const node& n) throw(exception) -> unique_ptr< node_tree >{
 				unique_ptr< node_tree > res(new node_tree(n));
-				node tmp(n.x, n.y - 1);
-				#define REPEATABLE_CODE_IN_build_and_clean(left_or_right)\
-				if (tmp > curent_usable && m.goal.distance(tmp) <= distance && !marks.get(tmp.x - LU_point.x, tmp.y - LU_point.y)){\
-					marks.set(tmp.x - LU_point.x, tmp.y - LU_point.y, true);\
-					res->left_or_right = build(tmp);\
+				#define REPEATABLE_CODE_IN_build_and_clean(parent, left_or_right)\
+				if (parent > curent_usable && m.goal.distance(parent) <= distance && !marks.get(parent.x, parent.y)){\
+					marks.set(parent.x, parent.y, true);\
+					if (!(res->left_or_right = build(parent))){\
+						marks.set(parent.x, parent.y, false);\
+						return nullptr;\
+					}\
 				}
 
-				if (n.y > 0 ) REPEATABLE_CODE_IN_build_and_clean(right);
-				if (n.x > 0 && n.y < max_y) REPEATABLE_CODE_IN_build_and_clean(left);
+				if (n.y > 0 ){
+					node parent(n.x, n.y - 1);
+					REPEATABLE_CODE_IN_build_and_clean(parent, right);
+				}
+				if (n.x > 0 && n.y < max_y){
+					node parent(n.x - 1, n.y + 1);
+					REPEATABLE_CODE_IN_build_and_clean(parent, left);
+				}
 				m[n].clear();
 				if (!next_use(*res)) return nullptr;
 				return std::move(res);
@@ -742,13 +763,16 @@ matrix< array<pair<T, bool>, 3> > get_textures_arrangement(const matrix<T>& sour
 					}
 				}
 			};
-			add_to_usable_nodes = [&add_to_usable_nodes, &m](node_tree& tree){
-				bool res = false;
-				if (tree.right) res |= add_to_usable_nodes(*tree.right);
-				if (tree.left) res |= add_to_usable_nodes(*tree.left);
+			add_to_usable_nodes = [&add_to_usable_nodes, &m](node_tree& tree)/*->bool*/{
+				//bool res = false;
+				if (tree.right) /*res |=*/ add_to_usable_nodes(*tree.right);
+				if (tree.left) /*res |=*/ add_to_usable_nodes(*tree.left);
 
-				if (res |= !m[tree.n].was_here()) m.usable_nodes.push_front( pair< node, unique_ptr< node_tree > >(tree.n, nullptr));
-				return res;
+				if (!m[tree.n].was_here()){
+					/*res = true;*/
+					m.usable_nodes.push_front( pair< node, unique_ptr< node_tree > >(tree.n, nullptr));
+				}
+				/*return res;*/
 			};
 			remember_all = [&remember_all, &m](node_tree& tree){
 				m[tree.n].remember();
@@ -763,23 +787,20 @@ matrix< array<pair<T, bool>, 3> > get_textures_arrangement(const matrix<T>& sour
 
 			while (m.usable_nodes.size()){
 				curent_usable = m.usable_nodes.begin()->first;
-				while (m[curent_usable].was_here() && !m.usable_nodes.begin()->second){
-					if (!m[curent_usable].can_be_used()){
+				while (!m.usable_nodes.begin()->second && m[curent_usable].was_here()){
+					if (!m[curent_usable].use()){
 						m.usable_nodes.pop_front();
 						if (m.usable_nodes.size()) curent_usable = m.usable_nodes.begin()->first;
 						else return false;
-					} else m[curent_usable].use();
+					}
 				}
 
-				unique_ptr< node_tree >& edge = m.usable_nodes.begin()->second;//край (облипляет curent_usable), сделан из "детей", правй указатель старше левого, а корень младше того и того.
+				unique_ptr< node_tree >& edge = m.usable_nodes.begin()->second;//край (облипляет curent_usable), сделан из "детей", правый указатель старше левого, а корень младше того и того.
 
 				if (edge) {
-					try {
-						next_use(*edge);
-					} catch (const exception&){
+					if(!next_use(*edge)){
 						clear_all(*edge);
-						while (m[curent_usable].can_be_used()){
-							m[curent_usable].use();
+						while (m[curent_usable].use()){
 							if (!m[curent_usable].was_here()){
 								if (next_use(*edge)) break;
 								else m[curent_usable].remember();
@@ -795,16 +816,25 @@ matrix< array<pair<T, bool>, 3> > get_textures_arrangement(const matrix<T>& sour
 					
 					if (distance < curent_usable.distance(m.goal)){
 						distance = curent_usable.distance(m.goal);
-						marks = matrix<bool>(min(distance, m.goal.x) + 1, min(distance, m.goal.y) + min(int(distance), m.m.get_h() - m.goal.y - 1) + 1);
-						LU_point = node(m.goal.x - min(distance, m.goal.x), m.goal.y - min(distance, m.goal.y));
+						start = node(m.goal.x - min(distance, m.goal.x), m.goal.y - min(distance, m.goal.y));
+						end = node(m.goal.x, min(max_y, m.goal.y + distance));
+							/*iter.start = node(min(max_x, m.goal.x + 1), m.goal.y - min(m.goal.y, distance));
+							cur = iter.start;
+							node last (min(max_x, m.goal.x + distance - 1), m.goal.y - min(m.goal.y, distance));
+							iter.end = node(last.x, min(last.x + last.y - start.x, max_y));*/
+							if (m.goal.x < max_x && m.goal.y > 1){
+								for (T i = 0, y = m.goal.y - min(m.goal.y, distance); (y + 2 <= m.goal.y) && m.m(m.goal.x + 1, y).was_used(); y++, i++){
+									for (T x = m.goal.x + 1; x <= min(max_x, m.goal.x + distance - 1 - i); x++){
+										m.m(x, y).clear();
+									}
+								}
+							}
 
 						/*
 							где-то тут надо сделать очистку детей узла, чтоб его можно было use
 
-							так, чтоб еще правый треугольник очистился, а потом где-то надо еще вставить очистку детей при переходе междк usable_nodes
+							очистка детей при переходе между usable_nodes
 						*/
-						iter.start = LU_point;
-						iter.end = ;
 					}
 					
 					{
@@ -821,8 +851,8 @@ matrix< array<pair<T, bool>, 3> > get_textures_arrangement(const matrix<T>& sour
 						remember_all(*edge);
 						if (distance == 1 || (m.goal.x == max_x && m.goal.y <= 1) ||
 							fill_infos(m.m, 
-							/*start*/node(m.goal.x + 1, m.goal.y - min(m.goal.y, distance)),
-							/*end*/node(m.goal.x + distance - 1, m.goal.y - min(m.goal.y, distance))))
+							/*start*/node(min(max_x, m.goal.x + 1), m.goal.y - min(m.goal.y, distance)),
+							/*goal*/node(min(max_x, m.goal.x + distance - 1), m.goal.y - min(m.goal.y, distance))))
 							return true;
 					}
 				}
