@@ -181,7 +181,7 @@ class info{//информация про узел
 public:
 	bool free;//показывает, является ли этот узел таким, что вокруг него много узлов с таким же цветом
 	static const T max_T;
-	//void* tag;
+	void* tag;
 
 ///////////////////////////////////////////
 
@@ -538,14 +538,25 @@ matrix< array<pair<T, bool>, 3> > get_textures_arrangement(const matrix<T>& sour
 
 		struct node_tree {
 			node n;
+			matrix< info >& infos;
 			unique_ptr< node_tree > left, right;//правый узел ставше (right < left)
-			node_tree(const node& n) : n(n){}
+			node_tree(const node& n, matrix< info >& infos) : n(n), infos(infos) {
+				if (infos(n.x, n.y).tag){
+					cerr << "if (infos(n.x, n.y).tag)";
+					throw exception();
+				}
+				infos(n.x, n.y).tag = (void*)1;
+			}
+			~node_tree(){
+				infos(n.x, n.y).tag = (void*)0;
+				infos(n.x, n.y).clear();
+			}
 		};
 
 	struct sub_matrix{
 		matrix<info> m;//хранит
 		node goal;//целевой узел
-		list< pair< node , unique_ptr< node_tree > > > usable_nodes/*еще могут менять уровень*/;
+		list< node > usable_nodes/*еще могут менять уровень*/;
 		sub_matrix(const node& barrier, const matrix<info> infos, const node& n_, T max_distance_x, T max_distance_y, const T& max_count_of_usable) : m(1, 1){
 			T size = 0, count_of_usable = 0, max_x = infos.get_w() - 1, max_y = infos.get_h() - 1;
 			max_distance_x = min(max_distance_x, goal.x);
@@ -579,7 +590,7 @@ matrix< array<pair<T, bool>, 3> > get_textures_arrangement(const matrix<T>& sour
 					n_ptr = n1 > n2 ? &n1 : &n2;//надо, чтоб было в начале цикла
 					tmp.x = n_ptr->x - LU_point.x;
 					tmp.y = n_ptr->y - LU_point.y;
-					if (m(tmp.x, tmp.y).can_be_used()) usable_nodes.push_back( pair< node , unique_ptr< node_tree > >(tmp, nullptr));
+					if (m(tmp.x, tmp.y).can_be_used()) usable_nodes.push_back(tmp);
 					if (n_ptr == &n1) n_ptr->y--;
 					else n_ptr->x--;
 				} while (n_ptr->distance(goal) == distance && !(*n_ptr < barrier) && usable_nodes.size() < max_count_of_usable);
@@ -713,16 +724,16 @@ matrix< array<pair<T, bool>, 3> > get_textures_arrangement(const matrix<T>& sour
 		static bool solve_the_problem (sub_matrix& m){
 			T distance = 0;
 			T w = m.m.get_w(), h = m.m.get_h();
-			auto max_y = h - 1, max_x = w - 1;
-			matrix<char> marks(w, h);
+			T max_y = h - 1, max_x = w - 1;
 			node curent_usable;
-			node start, end, cur, last = m.goal;
-			next_pred iter(start, end, cur);
+			node /*start, end, cur, */last = m.goal;
+			//next_pred iter(start, end, cur);
+			list< pair< node , unique_ptr< node_tree > > > usable_nodes;
 
 
 			for (T y = 0; y < h; y++){
 				for (T x = 0; x < w; x++){
-					marks.set(x, y, 1);
+					m.m(x, y).tag = (void*)1;
 				}
 			}
 
@@ -732,25 +743,18 @@ matrix< array<pair<T, bool>, 3> > get_textures_arrangement(const matrix<T>& sour
 			std::function< void(node_tree&) > remember_all;
 			std::function< void(node_tree&) > clear_all;
 			build = [&](const node& n) throw(exception) -> unique_ptr< node_tree >{
-				unique_ptr< node_tree > res(new node_tree(n));
-				#define REPEATABLE_CODE_IN_build_and_clean(parent, left_or_right)\
-				if (parent > curent_usable && m.goal.distance(parent) <= distance && !marks.get(parent.x, parent.y)){\
-					marks.set(parent.x, parent.y, true);\
-					if (!(res->left_or_right = build(parent))){\
-						marks.set(parent.x, parent.y, false);\
-						return nullptr;\
-					}\
-				}
+				if (m[n].tag) return nullptr;
+				unique_ptr< node_tree > res(new node_tree(n, m.m));
+				//#define REPEATABLE_CODE_IN_build_and_clean(parent, left_or_right)\
+				//if (/*parent > curent_usable && m.goal.distance(parent) <= distance && */ !m[parent].tag){\
+				//	if (!(res->left_or_right = build(parent))){\
+				//		marks.set(parent.x, parent.y, false);\
+				//		return nullptr;\
+				//	}\
+				//}
 
-				if (n.y > 0 ){
-					node parent(n.x, n.y - 1);
-					REPEATABLE_CODE_IN_build_and_clean(parent, right);
-				}
-				if (n.x > 0 && n.y < max_y){
-					node parent(n.x - 1, n.y + 1);
-					REPEATABLE_CODE_IN_build_and_clean(parent, left);
-				}
-				m[n].clear();
+				if (n.y > 0 ) res->right = build(node(n.x, n.y - 1));
+				if (n.x > 0 && n.y < max_y) res->left = build(node(n.x - 1, n.y + 1));
 				if (!next_use(*res)) return nullptr;
 				return std::move(res);
 			};
@@ -763,14 +767,14 @@ matrix< array<pair<T, bool>, 3> > get_textures_arrangement(const matrix<T>& sour
 					}
 				}
 			};
-			add_to_usable_nodes = [&add_to_usable_nodes, &m](node_tree& tree)/*->bool*/{
+			add_to_usable_nodes = [&](node_tree& tree)/*->bool*/{
 				//bool res = false;
 				if (tree.right) /*res |=*/ add_to_usable_nodes(*tree.right);
 				if (tree.left) /*res |=*/ add_to_usable_nodes(*tree.left);
 
 				if (!m[tree.n].was_here()){
 					/*res = true;*/
-					m.usable_nodes.push_front( pair< node, unique_ptr< node_tree > >(tree.n, nullptr));
+					usable_nodes.push_front( pair< node, unique_ptr< node_tree > >(tree.n, nullptr));
 				}
 				/*return res;*/
 			};
@@ -785,79 +789,96 @@ matrix< array<pair<T, bool>, 3> > get_textures_arrangement(const matrix<T>& sour
 				m[tree.n].clear();
 			};
 
-			while (m.usable_nodes.size()){
-				curent_usable = m.usable_nodes.begin()->first;
-				while (!m.usable_nodes.begin()->second && m[curent_usable].was_here()){
-					if (!m[curent_usable].use()){
-						m.usable_nodes.pop_front();
-						if (m.usable_nodes.size()) curent_usable = m.usable_nodes.begin()->first;
-						else return false;
+			
+			for (auto root_node : m.usable_nodes){
+				usable_nodes.push_front( pair< node, unique_ptr< node_tree > >(root_node, nullptr));
+
+				T last_distance = last.distance(m.goal);
+
+				if (distance != root_node.distance(m.goal)){
+					distance = root_node.distance(m.goal);
+					//start = node(m.goal.x - min(distance, m.goal.x), m.goal.y - min(distance, m.goal.y));
+					//end = node(m.goal.x, min(max_y, T(m.goal.y + distance)));
+					if (m.goal.x < max_x && m.goal.y > 1){
+						for (T i = 0, y = m.goal.y - min(m.goal.y, distance); (y + 2 <= m.goal.y) && m.m(m.goal.x + 1, y).was_used(); y++, i++){
+							for (T x = m.goal.x + 1; x <= min(max_x, T(m.goal.x + distance - 1 - i)); x++){
+								m.m(x, y).clear();
+							}
+						}
 					}
 				}
 
-				unique_ptr< node_tree >& edge = m.usable_nodes.begin()->second;//край (облипляет curent_usable), сделан из "детей", правый указатель старше левого, а корень младше того и того.
+				node n1(root_node.x, root_node.y + 1), n2, *n_ptr = &n1;
 
-				if (edge) {
-					if(!next_use(*edge)){
-						clear_all(*edge);
-						while (m[curent_usable].use()){
-							if (!m[curent_usable].was_here()){
-								if (next_use(*edge)) break;
-								else m[curent_usable].remember();
-							}
-						}
-						if (m[curent_usable].was_here()){
+				for (; *n_ptr != root_node; last_distance++){
+					n1.y = min((T)(m.goal.y + last_distance), max_y);
+					n1.x = (m.goal.x >= last_distance) ? m.goal.x - last_distance : n1.y = 0;
+					n2.x = m.goal.x;
+					n2.y = (m.goal.y >= last_distance) ? m.goal.y - last_distance : n2.x = 0;
+					do{
+						n_ptr = n1 > n2 ? &n1 : &n2;//надо, чтоб было в начале цикла
+						//
+						//useful code
+						m[*n_ptr].clear();
+						m[*n_ptr].tag = 0;
+						//
+						if (n_ptr == &n1) n_ptr->y--;
+						else n_ptr->x--;
+					} while (n_ptr->distance(m.goal) == last_distance && !(*n_ptr == root_node));
+				}
+
+
+				while (usable_nodes.size()){
+					curent_usable = usable_nodes.begin()->first;
+					while (!usable_nodes.begin()->second && m[curent_usable].was_here()){
+						if (!m[curent_usable].use()){
 							m.usable_nodes.pop_front();
-							continue;
-						} else { m[curent_usable].remember(); }
+							if (m.usable_nodes.size()) curent_usable = usable_nodes.begin()->first;
+							else return false;
+						}
 					}
-				} else {
-					m[curent_usable].remember();
-					
-					if (distance < curent_usable.distance(m.goal)){
-						distance = curent_usable.distance(m.goal);
-						start = node(m.goal.x - min(distance, m.goal.x), m.goal.y - min(distance, m.goal.y));
-						end = node(m.goal.x, min(max_y, m.goal.y + distance));
-							/*iter.start = node(min(max_x, m.goal.x + 1), m.goal.y - min(m.goal.y, distance));
-							cur = iter.start;
-							node last (min(max_x, m.goal.x + distance - 1), m.goal.y - min(m.goal.y, distance));
-							iter.end = node(last.x, min(last.x + last.y - start.x, max_y));*/
-							if (m.goal.x < max_x && m.goal.y > 1){
-								for (T i = 0, y = m.goal.y - min(m.goal.y, distance); (y + 2 <= m.goal.y) && m.m(m.goal.x + 1, y).was_used(); y++, i++){
-									for (T x = m.goal.x + 1; x <= min(max_x, m.goal.x + distance - 1 - i); x++){
-										m.m(x, y).clear();
-									}
+
+					unique_ptr< node_tree >& edge = usable_nodes.begin()->second;//край (облипляет curent_usable), сделан из "детей", правый указатель старше левого, а корень младше того и того.
+
+					if (edge) {
+						if(!next_use(*edge)){
+							clear_all(*edge);
+							while (m[curent_usable].use()){
+								if (!m[curent_usable].was_here()){
+									if (next_use(*edge)) break;
+									else m[curent_usable].remember();
 								}
 							}
+							if (m[curent_usable].was_here()){
+								m.usable_nodes.pop_front();
+								continue;
+							} else { m[curent_usable].remember(); }
+						}
+					} else {
+						m[curent_usable].remember();
 
-						/*
-							где-то тут надо сделать очистку детей узла, чтоб его можно было use
-
-							очистка детей при переходе между usable_nodes
-						*/
-					}
-					
-					{
+						
 						node max_child;//зависит от curent_usable и от всех остальных детей (если они есть)
 						
 						for (const auto& child : make_neighbors(curent_usable, w, h, (neighbor_number)(N3 | N4 | N5 | N6))){
 							if (child < m.goal && child.x <= m.goal.x && max_child < child) max_child = child;
 						}
+
 						if (!(edge = build(max_child))) continue;
 						//так получается частичная упорядоченность и можно применить какую-то несложную рекурсивную функцию для того, чтоб выполнить use() всеу узлам, что в edge
-					}
 
-					if (edge->n == m.goal){
-						remember_all(*edge);
-						if (distance == 1 || (m.goal.x == max_x && m.goal.y <= 1) ||
-							fill_infos(m.m, 
-							/*start*/node(min(max_x, m.goal.x + 1), m.goal.y - min(m.goal.y, distance)),
-							/*goal*/node(min(max_x, m.goal.x + distance - 1), m.goal.y - min(m.goal.y, distance))))
-							return true;
+						if (edge->n == m.goal){
+							remember_all(*edge);
+							if (distance == 1 || (m.goal.x == max_x && m.goal.y <= 1) ||
+								fill_infos(m.m, 
+								/*start*/node(min(max_x, T(m.goal.x + 1)), m.goal.y - min(m.goal.y, distance)),
+								/*goal*/node(min(max_x, T(m.goal.x + distance - 1)), m.goal.y - min(m.goal.y, distance))))
+								return true;
+						}
 					}
-				}
 				
-				add_to_usable_nodes(*edge);
+					add_to_usable_nodes(*edge);
+				}
 
 			}
 			return false;
