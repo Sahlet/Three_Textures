@@ -79,13 +79,13 @@ int main(){
 	//	2, 2, 2, 2,
 	//	3, 3, 3, 3
 	//};
-	const T w = 6, h = 4;
-	T arr[w * h] = {
-		3, 3, 3, 0, 0, 4,
-		3, 2, 2, 2, 2, 4,
-		3, 2, 2, 2, 2, 4,
-		1, 1, 1, 0, 0, 4
-	};
+	//const T w = 6, h = 4;
+	//T arr[w * h] = {
+	//	3, 3, 3, 0, 0, 4,
+	//	3, 2, 2, 2, 2, 4,
+	//	3, 2, 2, 2, 2, 4,
+	//	1, 1, 1, 0, 0, 4
+	//};
 	//const T w = 5, h = 10;
 	//T arr[w * h] = {
 	//	1, 1, 1, 1, 1,
@@ -99,18 +99,25 @@ int main(){
 	//	1, 1, 1, 2, 3,
 	//	1, 1, 1, 1, 4
 	//};
-	//const T w = 5, h = 5;
-	//T arr[w * h] = {
-	//	3, 3, 3, 1, 0,
-	//	3, 2, 4, 1, 3,
-	//	4, 2, 2, 1, 2,
-	//	0, 0, 4, 4, 4,
-	//	0, 0, 1, 4, 3
-	//};
+	const T w = 5, h = 5;
+	T arr[w * h] = {
+		3, 3, 3, 1, 0,
+		3, 2, 4, 1, 3,
+		4, 2, 2, 1, 2,
+		0, 0, 4, 4, 4,
+		0, 0, 1, 4, 3
+	};
 	vector<T> vec(arr, (T*)((char*)arr + sizeof(arr)));
 	matrix<T> source(w, h);
 	auto iter = vec.begin();
 	for (auto i = source.begin(), end = source.end(); i != end; i++, iter++) *i = *iter;
+	change_to_matrix_that_may_be_parsed_to_res(source);
+
+	//////////////////////////
+	//matrix< array<pair<T, bool>, 3> > res_(w, h);
+	//print (source, res_);
+	//system("pause");
+	//////////////////////////
 
 	////////////////////////////////////////////////////////
 	//const T w = 40, h = 40;
@@ -119,12 +126,12 @@ int main(){
 
 	////////////////////////////////////////////////////////	
 	
-	auto res = get_textures_arrangement(source);
+	matrix< array<pair<T, bool>, 3> > res = get_textures_arrangement(source);
 
 
 	auto diff = difference(source, res_to_source(res));
 	cout << "difference is " << diff << " = " << (diff / (float)(w * h)) * 100 << "%" << endl << endl;
-	print(source, res);
+	//print(source, res);
 
 	system("pause");
 }

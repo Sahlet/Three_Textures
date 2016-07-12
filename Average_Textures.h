@@ -5,6 +5,9 @@
 using namespace std;
 typedef unsigned short T;
 
+//изменяет в матрицу, которая может иметь решение
+void change_to_matrix_that_may_be_parsed_to_res(matrix< T >& res);
+
 matrix< array<pair<T, bool>, 3> > get_textures_arrangement/*взять расстановку текстур*/(const matrix<T>& source) throw(exception);
 matrix< T > res_to_source(const matrix< array<pair<T, bool>, 3> >& res);
 
