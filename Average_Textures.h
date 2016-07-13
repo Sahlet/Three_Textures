@@ -13,4 +13,3 @@ matrix< T > res_to_source(const matrix< array<pair<T, bool>, 3> >& res);
 
 //в первых двух аргументах приходит размерность ширина и высота, а третим количество текстур
 matrix<T> gen_sourse_data(const T& w, const T& h, const T& n_textures);
-matrix< array<pair<T, bool>, 3> > gen_solution_data(const T& w, const T& h, const T& n_textures) throw(exception);

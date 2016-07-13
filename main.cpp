@@ -141,7 +141,6 @@ int main(){
 
 	//////////////////////////
 	const T w = 20, h = 20;
-	//matrix<T> source = res_to_source(gen_solution_data(w, h, 10));
 	matrix<T> source = gen_sourse_data(w, h, 5);
 	#endif
 	#ifdef WRITE

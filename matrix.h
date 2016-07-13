@@ -21,11 +21,7 @@ public:
 	const T& get_w() const {return w;}
 	const T& get_h() const {return h;}
 	Type& operator()(const T& x, const T& y) throw(std::exception){
-		//try{
 		return vec[x + y*w];
-		//} catch(...){
-		//	int i = 0;
-		//}
 	}
 	//void set (const T& x, const T& y, const Type& obj) throw(std::exception){
 	//	vec[x + y*w] = obj;
