@@ -167,7 +167,7 @@ void change_to_matrix_that_may_be_parsed_to_res(matrix< T >& res){
 class info{//информация про узел
 	enum level : char {NONE = 0, FIRST = 1, SECOND = 2, THIRD = 4};
 	char used;//использованные уровни
-	mutable char taken;//уровни, взятые в предыдущих соседних узлах.
+	char taken;//уровни, взятые в предыдущих соседних узлах.
 	char given;//уровни, которые дали следующие узлы.
 	/*в given будем помещать только уровень, который дал один следующий узел, а в taken все возможные (в соответствии с его описанием см.выше.)*/
 	T texture;
@@ -251,6 +251,10 @@ public:
 	}
 	
 	inline bool give(const char& l, const T& texture){
+		if (!used){
+			cerr << "if (!used) in give()" << endl;
+			//throw(exception("после отладки программы этот throw надо удалить"));
+		}
 		if(!l){
 			cerr << "if(!l)" << endl;
 			throw(exception("после отладки программы этот throw надо удалить"));
@@ -263,6 +267,10 @@ public:
 		return true;
 	}
 	inline bool can_give(const int& l, const T& texture) const{
+		if (!used){
+			cerr << "if (!used) in give()" << endl;
+			//throw(exception("после отладки программы этот throw надо удалить"));
+		}
 		if(!l){
 			cerr << "if(!l)" << endl;
 			throw(exception("после отладки программы этот throw надо удалить"));
@@ -278,7 +286,10 @@ public:
 		if (!cur_level) return;
 		bool can_remove_from_this_accepting_neighbor;
 		for (auto i : valuable_neighbors){
-			if (!(i->given & cur_level)) continue;
+			if (!(i->given & cur_level)){
+				cerr << "if (!(i->given & cur_level))" << endl;
+				continue;
+			}
 			can_remove_from_this_accepting_neighbor = true;
 			for (auto j : i->depending_neighbors){
 				if (j != this && j->texture == texture && j->cur_level == cur_level){
@@ -291,7 +302,7 @@ public:
 				if (!((i->cur_level == cur_level) || (i->taken & cur_level)))i->textures[cur_level/2] = max_T;
 			}
 		}
-		if (!(taken & cur_level)) textures[cur_level/2] = max_T;
+		if (!((taken | given) & cur_level)) textures[cur_level/2] = max_T;
 		cur_level = NONE;
 	}
 	
@@ -323,9 +334,9 @@ public:
 		remove_from_the_level();
 		used = NONE;
 		taken = NONE;
-		given = NONE;
+		//given = NONE;
 		cur_level = NONE;
-		free = false;
+		//free = false;
 		for (size_t i = 0; i < textures.size(); i++) textures[i] = max_T;
 	}
 	//текстура должна стать на любой свободный уровень, который еще не использован
@@ -344,7 +355,7 @@ public:
 						if (textures[l/2] != i->textures[l/2]){
 							//этот код, как мне кажется, не должен никогда выполниться
 							cerr << "if (textures[l/2] != infos(i.x, i.y).textures[l/2])" << endl;
-							throw(exception("после отладки программы этот throw надо удалить"));
+							//throw(exception("после отладки программы этот throw надо удалить"));
 						}
 					} else {
 						taken |= l;
@@ -513,7 +524,7 @@ matrix< array<pair<T, bool>, 3> > get_textures_arrangement(const matrix<T>& sour
 			infos(x, y).free = true;
 			for (int x_ = int(x) - 2; x_ <= x + 2; x_++){
 				for (int y_ = int(y) - 2; y_ <= y + 2; y_++){
-					if (x_ >= 0 && y_ >= 0){
+					if (x_ >= 0 && y_ >= 0 && x_ < w && y_ < h){
 						if (infos(x_, y_).get_texture() != infos(x, y).get_texture()){
 							infos(x, y).free = false;
 							x_ = x + 2;
@@ -615,12 +626,17 @@ matrix< array<pair<T, bool>, 3> > get_textures_arrangement(const matrix<T>& sour
 					n_ptr = n1 > n2 ? &n1 : &n2;//надо, чтоб было в начале цикла
 					tmp.x = n_ptr->x - LU_point.x;
 					tmp.y = n_ptr->y - LU_point.y;
+					if (tmp == node(1, 8)){
+						int i = 0;
+					}
 					if (m(tmp.x, tmp.y).can_be_used()) usable_nodes.push_back(tmp);
 					if (n_ptr == &n1) n_ptr->y--;
 					else n_ptr->x--;
 				} while (n_ptr->distance(goal) == distance && !(*n_ptr < barrier) && usable_nodes.size() < max_count_of_usable);
 				//} while (n_ptr->distance(goal) == distance && /**n_ptr > barrier && */usable_nodes.size() < max_count_of_usable);
 			}
+
+			if (usable_nodes.size() && *usable_nodes.rbegin() == node(0, 0)) usable_nodes.pop_back();
 		}
 		info& operator[](const node& n){return m(n.x, n.y);}
 		void save_to(matrix<info>& infos, const node& n_){
@@ -729,7 +745,7 @@ matrix< array<pair<T, bool>, 3> > get_textures_arrangement(const matrix<T>& sour
 						infos(x, y).remember();
 						for (int x_ = (int)x - 2; x_ <= x + 2; x_++){
 							for (int y_ = (int)y - 2; y_ <= y + 2; y_++){
-								if (x_ >= 0 && y_ >= 0){
+								if (x_ >= 0 && y_ >= 0 && x_ < infos.get_w() && y_ < infos.get_h()){
 									if (infos(x_, y_).free){
 										infos(x_, y_).free = false;//это удалять нельзя
 										if (node(x_, y_) < cur){
@@ -766,7 +782,7 @@ matrix< array<pair<T, bool>, 3> > get_textures_arrangement(const matrix<T>& sour
 			node curent_usable;
 			node /*start, end, cur, */last = m.goal;
 			//next_pred iter(start, end, cur);
-			list< pair< node , unique_ptr< node_tree > > > usable_nodes;
+			list< pair< node , unique_ptr< node_tree > > > enumerating_nodes;//перебираемые узлы
 			bool solved = false;
 
 
@@ -799,6 +815,9 @@ matrix< array<pair<T, bool>, 3> > get_textures_arrangement(const matrix<T>& sour
 			};
 			next_use = [&next_use, &m](node_tree& tree) -> bool {
 				while (true){
+					if (tree.n == node(1, 8)){
+						int i = 0;
+					}
 					if (m.m[tree.n].use()) return true;
 					else {
 						m.m[tree.n].clear();
@@ -814,7 +833,7 @@ matrix< array<pair<T, bool>, 3> > get_textures_arrangement(const matrix<T>& sour
 				if (!m[tree.n].was_here()){
 					/*res = true;*/
 					m[tree.n].remember();
-					usable_nodes.push_front( pair< node, unique_ptr< node_tree > >(tree.n, nullptr));
+					enumerating_nodes.push_front( pair< node, unique_ptr< node_tree > >(tree.n, nullptr));
 				}
 				/*return res;*/
 			};
@@ -831,12 +850,15 @@ matrix< array<pair<T, bool>, 3> > get_textures_arrangement(const matrix<T>& sour
 
 			
 			for (auto root_node : m.usable_nodes){
+				if (root_node == node(1, 8)){
+						int i = 0;
+				}
 				if (!m[root_node].use()){
 					cerr << "if (m[root_node].use())" << endl;
 					continue;
 				}
 				m[root_node].remember();
-				usable_nodes.push_front( pair< node, unique_ptr< node_tree > >(root_node, nullptr));
+				enumerating_nodes.push_front( pair< node, unique_ptr< node_tree > >(root_node, nullptr));
 
 				T last_distance = last.distance(m.goal);
 				last = root_node;
@@ -874,18 +896,18 @@ matrix< array<pair<T, bool>, 3> > get_textures_arrangement(const matrix<T>& sour
 					} while (n_ptr->distance(m.goal) == last_distance);
 				}
 
-				while (usable_nodes.size()){
-					curent_usable = usable_nodes.begin()->first;
+				while (enumerating_nodes.size()){
+					curent_usable = enumerating_nodes.begin()->first;
 					/*if (!usable_nodes.begin()->second && m[curent_usable].was_here()){
 						usable_nodes.pop_front();
 						continue;
 					}*/
 
-					unique_ptr< node_tree >& edge = usable_nodes.begin()->second;//край (облипляет curent_usable), сделан из "детей", правый указатель старше левого, а корень младше того и того.
+					unique_ptr< node_tree >& edge = enumerating_nodes.begin()->second;//край (облипляет curent_usable), сделан из "детей", правый указатель старше левого, а корень младше того и того.
 
 					if (edge) {
 						if(!next_use(*edge)){
-							usable_nodes.pop_front();
+							enumerating_nodes.pop_front();
 							continue;
 						}
 					} else {
@@ -895,8 +917,11 @@ matrix< array<pair<T, bool>, 3> > get_textures_arrangement(const matrix<T>& sour
 							if (!(child > m.goal) && child.x <= m.goal.x && max_child < child) max_child = child;
 						}
 
-						if (!(edge = build(max_child))) continue;
 						//так получается частичная упорядоченность и можно применить какую-то несложную рекурсивную функцию для того, чтоб выполнить use() всеу узлам, что в edge
+						if (!(edge = build(max_child))){
+							enumerating_nodes.pop_front();
+							continue;
+						}
 
 						if (max_child == m.goal){
 							if (distance == 1 || (m.goal.x == max_x && m.goal.y <= 1) ||
