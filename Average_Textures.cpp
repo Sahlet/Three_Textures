@@ -164,155 +164,95 @@ void change_to_matrix_that_may_be_parsed_to_res(matrix< T >& res){
 	}
 }
 
+template<class TAG = void*>
+//typedef void* TAG;
 class info{//информация про узел
-	enum level : char {NONE = 0, FIRST = 1, SECOND = 2, THIRD = 4};
-	char used;//использованные уровни
-	char taken;//уровни, взятые в предыдущих соседних узлах.
-	char given;//уровни, которые дали следующие узлы.
-	/*в given будем помещать только уровень, который дал один следующий узел, а в taken все возможные (в соответствии с его описанием см.выше.)*/
-	T texture;
-	int cur_level;//показывает на каком уровне сейчас стоит 1
-	mutable array< T , 3 > textures;//(значимые только те текстуры, которые отмечены в taken или в given или в cur_level)
-	map< array< T , 3 > , char> memory;
-
-	vector< info* > valuable_neighbors;//узлы, от которых зависит этот.
-	vector< info* > depending_neighbors;//узлы, которые зависят от этого.
-
 public:
-	bool free;//показывает, является ли этот узел таким, что вокруг него много узлов с таким же цветом
+	enum level : char {NONE = 0, FIRST = 1, SECOND = 2, THIRD = 4};
 	static const T max_T;
-	void* tag;
-
-///////////////////////////////////////////
-
-	info() : texture(max_T) , free(false), used (NONE), taken (NONE), given (NONE), cur_level (NONE){}
-	info(const node& n, matrix<info>& owner, const T& texture) : texture(texture), free(false), used (NONE), taken (NONE), given (NONE), cur_level (NONE){
-		if (texture == max_T) throw exception();
-		for (size_t i = 0; i < textures.size(); i++) textures[i] = max_T;
-		set_neighbors(n, owner);
-	}
-	info(const info& inf) : 
-		used(inf.used),
-		taken(inf.taken),
-		given(inf.given),
-		cur_level(inf.cur_level),
-		textures(inf.textures),
-		memory(inf.memory),
-		free(inf.free){
+	TAG tag;
+	struct Texture {
+		char count;
+		T texture;//значимые только те текстуры, которые не равны max_T
+		Texture() : count(), texture(max_T){}
+		Texture(const T& texture) : count(), texture(texture){}
+		inline void operator --(int){
 			if (texture == max_T){
-				valuable_neighbors = inf.valuable_neighbors;
-				depending_neighbors = inf.depending_neighbors;
+				cerr << "if (texture == max_T)" << endl;
+				throw exception("del me after debug");
 			}
-			texture = inf.texture;
-	}
-	info& operator=(const info& inf){
-		used = inf.used;
-		taken = inf.taken;
-		given = inf.given;
-		cur_level = inf.cur_level;
-		textures = inf.textures;
-		memory = inf.memory;
-		free = inf.free;
-		if (texture == max_T){
-			valuable_neighbors = inf.valuable_neighbors;
-			depending_neighbors = inf.depending_neighbors;
+			if (!count){
+				cerr << "if (!count)" << endl;
+				throw exception("del me after debug");
+			}
+			if (--count == 0) texture = max_T;
 		}
-		texture = inf.texture;
-		return *this;
-	}
-	info(info&& inf) : 
-		used(inf.used),
-		taken(inf.taken),
-		given(inf.given),
-		cur_level(inf.cur_level),
-		textures(inf.textures),
-		memory(std::move(inf.memory)),
-		free(inf.free){
+		inline bool can_give(const T& texture)const{
 			if (texture == max_T){
-				valuable_neighbors = std::move(inf.valuable_neighbors);
-				depending_neighbors = std::move(inf.depending_neighbors);
+				cerr << "if (texture == max_T)" << endl;
+				throw exception("del me after debug");
 			}
-			texture = inf.texture;
-	}
-	info& operator=(info&& inf){
-		used = inf.used;
-		taken = inf.taken;
-		given = inf.given;
-		cur_level = inf.cur_level;
-		textures = inf.textures;
-		memory = std::move(inf.memory);
-		free = inf.free;
-		if (texture == max_T){
-			valuable_neighbors = std::move(inf.valuable_neighbors);
-			depending_neighbors = std::move(inf.depending_neighbors);
+			if (this->texture == max_T || this->texture == texture) return true;
+			return false;
 		}
-		texture = inf.texture;
-		return *this;
-	}
-	
-	inline bool give(const char& l, const T& texture){
-		if (!used){
-			cerr << "if (!used) in give()" << endl;
-			//throw(exception("после отладки программы этот throw надо удалить"));
+		inline void give(const T& texture){
+			if (!can_give(texture)){
+				cerr << "if (!can_give(texture))" << endl;
+				throw exception("del me after debug");
+			}
+			if (!count++) this->texture = texture;
 		}
-		if(!l){
-			cerr << "if(!l)" << endl;
-			throw(exception("после отладки программы этот throw надо удалить"));
+	};
+	struct Level {
+		level l;
+		T texture;
+		Level() : l(NONE), texture(max_T){}
+		Level(const T& texture) : l(NONE), texture(texture){
+			if (texture == max_T) throw exception("max_T");
 		}
-		//следующий узел хочет записать текстуру texture на уровень l и вызывает эту функцию.
-		if (l & (taken | given | cur_level)){
-			if (textures[l/2] != texture) return false/*нельзя добавлять текстуру*/;
-		} else textures[l/2] = texture;
-		given |= l;
-		return true;
-	}
+		Level& operator = (const level& l){
+			this->l = l;
+		}
+	};
+private:
+	bool free;//показывает, является ли этот узел таким, что вокруг него много узлов с таким же цветом
+	level used;//уровни, что были использованы этим узлом
+	typedef array< Texture , 3> INFO;
+	INFO filling;//заполнение
+	Level cur_level;//показывает на каком уровне сейчас стоит 1
+
+	vector< info* > neighbors;
+
+	map< INFO , level> memory;
+
+
 	inline bool can_give(const int& l, const T& texture) const{
-		if (!used){
-			cerr << "if (!used) in give()" << endl;
-			//throw(exception("после отладки программы этот throw надо удалить"));
-		}
 		if(!l){
 			cerr << "if(!l)" << endl;
 			throw(exception("после отладки программы этот throw надо удалить"));
 		}
-		//некоторый узел спрашивает, можно ли на уровень l поставить текстуру texture.
-		if (l & (taken | given | cur_level)){
-			if (textures[l/2] != texture) return false/*нельзя добавлять текстуру*/;
+		if (filling[l/2].can_give(texture)) return true;
+		return false;
+	}
+	inline void give(const char& l, const T& texture){
+		if (!can_give(l, texture)){
+			cerr << "if (!can_give(l, texture))" << endl;
+			throw exception("del me after debug");
 		}
-		return true;
+		filling[l/2].give(texture);
 	}
 	
 	void remove_from_the_level(){
-		if (!cur_level) return;
-		bool can_remove_from_this_accepting_neighbor;
-		for (auto i : valuable_neighbors){
-			if (!(i->given & cur_level)){
-				cerr << "if (!(i->given & cur_level))" << endl;
-				continue;
-			}
-			can_remove_from_this_accepting_neighbor = true;
-			for (auto j : i->depending_neighbors){
-				if (j != this && j->texture == texture && j->cur_level == cur_level){
-					can_remove_from_this_accepting_neighbor = false;
-					break;
-				}
-			}
-			if (can_remove_from_this_accepting_neighbor){
-				i->given ^= cur_level;
-				if (!((i->cur_level == cur_level) || (i->taken & cur_level)))i->textures[cur_level/2] = max_T;
-			}
+		if (!cur_level.l) return;
+		for (auto i : neighbors){
+			i->filling[cur_level.l/2]--;
 		}
-		if (!((taken | given) & cur_level)) textures[cur_level/2] = max_T;
-		cur_level = NONE;
-	}
-	
-	bool can_be_used() const {
-		level l;
-		return can_be_used(l);
+		this->filling[cur_level.l/2]--;
+		cur_level.l = NONE;
 	}
 	bool can_be_used(level& l) const {
-		l = level((FIRST | SECOND | THIRD) ^ used);
-		if (free || !l) return false;
+		if (free) return false;
+		if (!(l = level((FIRST | SECOND | THIRD) ^ used))) return false;
 
 		struct tmp_struct{
 			static bool func(const vector< info* >& neighbors, const T& texture, const level& l){
@@ -323,54 +263,88 @@ public:
 			}
 		};
 
-		if ((l & FIRST) && (!tmp_struct::func(valuable_neighbors, texture, FIRST) || ((given & FIRST) && textures[0] != texture))) l = level(l ^ FIRST);
-		if ((l & SECOND) && (!tmp_struct::func(valuable_neighbors, texture, SECOND) || ((given & SECOND) && textures[1] != texture))) l = level(l ^ SECOND);
-		if ((l & THIRD) && (!tmp_struct::func(valuable_neighbors, texture, THIRD) || ((given & THIRD) && textures[2] != texture))) l = level(l ^ THIRD);
+		if ((l & FIRST) && !tmp_struct::func(neighbors, cur_level.texture, FIRST)) l = level(l ^ FIRST);
+		if ((l & SECOND) && !tmp_struct::func(neighbors, cur_level.texture, SECOND)) l = level(l ^ SECOND);
+		if ((l & THIRD) && !tmp_struct::func(neighbors, cur_level.texture, THIRD)) l = level(l ^ THIRD);
 
 		if (!l) return false;
 		return true;
 	}
-	void clear(){
+	inline bool check_on_free(){
+		//такую сложность можно позволить, так как эта функция будет редко вызываться
+		for (auto i : neighbors){
+			for (auto j : i->neighbors){
+				if (j->cur_level.texture != cur_level.texture) return (free = false);
+				
+			}
+		}
+		free = true;
+		clear();
+		return true;
+	}
+public:
+
+	info() : free(false), used (NONE), filling(){
+		int i = 0;//посмотреть как инициализируется filling
+	}
+	info(const node& n, matrix< info< TAG > >& owner, const T& texture) : cur_level(texture), free(false), filling(), used (NONE){
+		set_neighbors(n, owner);
+	}
+	info(const info& inf) : 
+		used(inf.used),
+		filling(inf.filling),
+		memory(inf.memory),
+		free(inf.free){
+			if (cur_level.texture == max_T) neighbors = inf.neighbors;
+			cur_level = inf.cur_level;
+	}
+	info& operator=(const info& inf){
+		used = inf.used;
+		filling = inf.filling;
+		memory = inf.memory;
+		free = inf.free;
+		if (cur_level.texture == max_T) neighbors = inf.neighbors;
+		cur_level = inf.cur_level;
+		return *this;
+	}
+	info(info&& inf) :
+		used(inf.used),
+		filling(inf.filling),
+		memory(std::move(inf.memory)),
+		free(inf.free){
+			if (cur_level.texture == max_T) neighbors = std::move(inf.neighbors);
+			cur_level = inf.cur_level;
+	}
+	info& operator=(info&& inf){
+		used = inf.used;
+		filling = inf.filling;
+		memory = std::move(inf.memory);
+		free = inf.free;
+		if (cur_level.texture == max_T) neighbors = std::move(inf.neighbors);
+		cur_level = inf.cur_level;
+		return *this;
+	}
+	
+	inline bool can_be_used() const {
+		level l;
+		return can_be_used(l);
+	}
+	inline void clear(){
 		remove_from_the_level();
 		used = NONE;
-		taken = NONE;
-		//given = NONE;
-		cur_level = NONE;
-		//free = false;
-		for (size_t i = 0; i < textures.size(); i++) textures[i] = max_T;
 	}
 	//текстура должна стать на любой свободный уровень, который еще не использован
 	inline bool use(){
 		if (free) return true;
 		level can_be_cur;
 		if (!can_be_used(can_be_cur)) return false;
-
-		if (!taken){
-			//определяем taken
-			char l;
-			for (const auto& i : valuable_neighbors){
-				//i может быть free
-				if (l = i->cur_level){
-					if (l & taken){
-						if (textures[l/2] != i->textures[l/2]){
-							//этот код, как мне кажется, не должен никогда выполниться
-							cerr << "if (textures[l/2] != infos(i.x, i.y).textures[l/2])" << endl;
-							//throw(exception("после отладки программы этот throw надо удалить"));
-						}
-					} else {
-						taken |= l;
-						textures[l/2] = i->textures[l/2];
-					}
-				}
-			}
-		}
 		
 		if (used) remove_from_the_level();
 
 		//сначала пытаемся добавить текстуру на тот уровень, на котором есть такие же
-		if ((FIRST & can_be_cur) && (FIRST & taken)) cur_level = FIRST;
-		else if((SECOND & can_be_cur) && (SECOND & taken)) cur_level = SECOND;
-		else if((THIRD & can_be_cur) && (THIRD & taken)) cur_level = THIRD;
+		if ((FIRST & can_be_cur) && filling[0].count) cur_level = FIRST;
+		else if((SECOND & can_be_cur) && filling[0].count) cur_level = SECOND;
+		else if((THIRD & can_be_cur) && filling[0].count) cur_level = THIRD;
 		else if(FIRST & can_be_cur)  cur_level = FIRST;
 		else if(SECOND & can_be_cur) cur_level = SECOND;
 		else if(THIRD & can_be_cur)  cur_level = THIRD;
@@ -379,51 +353,32 @@ public:
 			throw exception();
 		}
 		
-		for (auto i : valuable_neighbors){
-			i->give(cur_level, texture);
+		for (auto i : neighbors){
+			i->give(cur_level.l, cur_level.texture);
 		}
+		this->give(cur_level.l, cur_level.texture);
 
-		used |= cur_level;
-		textures[cur_level / 2] = texture;
+		used = level(used | cur_level.l);
 
 		return true;
 	}
-	bool was_used(){ return bool(used); }
+	inline bool was_used(){ return bool(used); }
 
-	bool was_here(){
+	inline bool was_here(){
 		if (free) return true;
 		if (!used){
 			cerr << "if (!used)" << endl;
 			//throw(exception("после отладки программы этот throw надо удалить"));
 		}
-		array< T , 3 > first;
-		if (FIRST & (taken | cur_level)) first[0] = textures[0];
-		else first[0] = max_T;
-
-		if (SECOND & (taken | cur_level)) first[1] = textures[1];
-		else first[1] = max_T;
-
-		if (THIRD & (taken | cur_level)) first[2] = textures[2];
-		else first[2] = max_T;
-
-		return memory[first] & cur_level;
+		
+		return memory[filling] & cur_level.l;
 	}
-	void remember(){
+	inline void remember(){
 		if (free) return;
-
-		array< T , 3 > first;
-		if (FIRST & (taken | cur_level)) first[0] = textures[0];
-		else first[0] = max_T;
-
-		if (SECOND & (taken | cur_level)) first[1] = textures[1];
-		else first[1] = max_T;
-
-		if (THIRD & (taken | cur_level)) first[2] = textures[2];
-		else first[2] = max_T;
-
-		memory[first] |= cur_level;
+		auto& level_ = memory[filling];
+		level_ = level(level_ | cur_level.l);
 	}
-	void clear_memory(){
+	inline void clear_memory(){
 		memory.clear();
 	}
 
@@ -432,33 +387,85 @@ public:
 			cerr << "if (texcure == max_T)" << endl;
 			throw(exception("после отладки программы этот throw надо удалить"));
 		}
-		if (this->texture != texcure){
+		if (cur_level.texture != texcure){
 			clear();
 			clear_memory();
-			this->texture = texcure;
+			cur_level.texture = texcure;
+			//не экономно, но по-другому сложно и это относительно редко используется (не жалко)
+			for (auto i : neighbors){
+				for (auto j : i->neighbors){
+					if (!j->used){
+						if (j->free) j->free = false;
+						else j->check_on_free();
+					}
+				}
+			}
 		}
 	}
-	void set_neighbors(const node& n, matrix<info>& owner){
-		auto neighbors = make_neighbors(n, owner.get_w(), owner.get_h(), neighbor_number(N1 | N2 | N7 | N8));
-		valuable_neighbors = vector<info*>(neighbors.size());
-		auto iter = neighbors.begin();
-		for (size_t i = 0; i < valuable_neighbors.size(); i++, iter++){
-			valuable_neighbors[i] = &owner(iter->x, iter->y);
+	void set_texture(const T& texcure, const node& n, matrix< info< TAG > >& owner){
+		if (texcure == max_T){
+			cerr << "if (texcure == max_T)" << endl;
+			throw(exception("после отладки программы этот throw надо удалить"));
 		}
+		if (cur_level.texture != texcure){
+			clear();
+			clear_memory();
+			cur_level.texture = texcure;
+			if (n.x + 2 < owner.get_w()){
+				T x = n.x + 2, max_y = min(owner.get_h() - 1, n.y + 2);
+				for (T y = n.y > 2 ? n.y - 2 : 0; y <= max_y; y++){
+					if (owner(x, y).free) owner(x, y).free = false;
+					else owner(x, y).check_on_free();
+				}
+			}
+		}
+	}
+	void set_neighbors(const node& n, matrix<info < TAG > >& owner){
+		auto neighbors_x_y = make_neighbors(n, owner.get_w(), owner.get_h());
+		neighbors = vector<info*>(neighbors_x_y.size());
+		auto iter = neighbors_x_y.begin();
+		for (size_t i = 0; i < neighbors.size(); i++, iter++){
+			neighbors[i] = &owner(iter->x, iter->y);
+		}
+	}
+	inline Level get_cur_level(){ return cur_level; }
+	inline T operator[](const size_t& i){ return filling[i].texture; }
 
-		neighbors = make_neighbors(n, owner.get_w(), owner.get_h(), neighbor_number(N3 | N4 | N5 | N6));
-		depending_neighbors = vector<info*>(neighbors.size());
-		iter = neighbors.begin();
-		for (size_t i = 0; i < depending_neighbors.size(); i++, iter++){
-			depending_neighbors[i] = &owner(iter->x, iter->y);
+	static void set_free(matrix< info < TAG > >& owner){
+		T w = owner.get_w(), h = owner.get_h(), texture;
+		for (T x = 0; x < w; x++){
+			for (T y = 0; y < h; y++){
+				owner(x, y).free = true;
+				texture = owner(x, y).cur_level.texture;
+				for (int x_ = int(x) - 2; x_ <= x + 2; x_++){
+					for (int y_ = int(y) - 2; y_ <= y + 2; y_++){
+						if (x_ >= 0 && y_ >= 0 && x_ < w && y_ < h){
+							if (owner(x_, y_).cur_level.texture != texture){
+								owner(x, y).free = false;
+								x_ = x + 2;
+								break;
+							}
+						}
+					}
+				}
+				if (owner(x, y).free) owner(x, y).clear();
+			}
 		}
 	}
-	T get_texture(){ return texture; }
-	T get_cur_level(){ return cur_level; }
-	T operator[](const size_t& i){ return textures[i]; }
+	inline void use_free(){
+		if (!free) return;
+		cur_level.l = FIRST;
+		for (auto i : neighbors){
+			i->give(cur_level.l, cur_level.texture);
+		}
+		this->give(cur_level.l, cur_level.texture);
+
+		used = level(used | cur_level.l);
+	}
+	inline bool get_free(){ return free; }
 };
 
-const T info::max_T = 0u - 1;
+const T info<void*>::max_T = 0u - 1;
 const T MAX_DISTANCE = 5;
 const T MAX_COUNT_OF_USABLE = 15;
 
@@ -519,7 +526,7 @@ matrix< array<pair<T, bool>, 3> > get_textures_arrangement(const matrix<T>& sour
 		}
 	}
 	//не надо совмещать этот цикл и предыдущий
-	for (T x = 0; x < w; x++){
+	/*for (T x = 0; x < w; x++){
 		for (T y = 0; y < h; y++){
 			infos(x, y).free = true;
 			for (int x_ = int(x) - 2; x_ <= x + 2; x_++){
@@ -534,7 +541,7 @@ matrix< array<pair<T, bool>, 3> > get_textures_arrangement(const matrix<T>& sour
 				}
 			}
 		}
-	}
+	}*/
 	
 	struct funcs{
 
