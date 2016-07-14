@@ -30,6 +30,11 @@ void print(const matrix< T >& source, const matrix< array<pair<T, bool>, 3> >& r
 		cout << endl;
 		for (T x = 0; x < w; x++){
 			s = to_string(source(x, y));
+			T i_ = 0;
+			for (; i_ < NUMBER_OF_LEVELS; i_++){
+				if (res(x, y)[i_].second) break;
+			}
+			if (i_ == NUMBER_OF_LEVELS || res(x, y)[i_].first != source(x, y)) s += "x";
 			for (T i = 0; i < str_len; i++) cout.put(i < s.length() ? s[i] : ' ');
 			cout << space;
 		}
@@ -66,9 +71,9 @@ void print(const matrix< array<pair<T, bool>, 3> >& res){
 }
 
 //#define READ
-#define WRITE
+//#define WRITE
 #define SOLVE
-#define PRINT_SOLUTION
+//#define PRINT_SOLUTION
 
 int main(){
 	string buffer("buffer.txt");
@@ -76,105 +81,48 @@ int main(){
 	
 
 	#ifdef READ
-	T w, h;
-	ifstream in_stream(buffer);
-	in_stream >> w >> h;
-	matrix<T> source(w, h);
-	for (auto& i : source){
-		in_stream >> i;
-	}
-	in_stream.close();
+		T w, h;
+		ifstream in_stream(buffer);
+		in_stream >> w >> h;
+		matrix<T> source(w, h);
+		for (auto& i : source){
+			in_stream >> i;
+		}
+		in_stream.close();
 	#else
-	//////////////////////////////////////////////////////
-
-	//const T w = 4, h = 4;
-	//T arr[w * h] = {
-	//	3, 3, 3, 1,
-	//	3, 2, 2, 1,
-	//	3, 2, 2, 1,
-	//	0, 0, 0, 0
-	//};
-	//const T w = 4, h = 5;
-	//T arr[w * h] = {
-	//	0, 0, 0, 0,
-	//	1, 1, 1, 2,
-	//	1, 1, 1, 2,
-	//	2, 2, 2, 2,
-	//	3, 3, 3, 3
-	//};
-	//const T w = 6, h = 4;
-	//T arr[w * h] = {
-	//	3, 3, 3, 0, 0, 4,
-	//	3, 2, 2, 2, 2, 4,
-	//	3, 2, 2, 2, 2, 4,
-	//	1, 1, 1, 0, 0, 4
-	//};
-	//const T w = 5, h = 10;
-	//T arr[w * h] = {
-	//	1, 1, 1, 1, 1,
-	//	1, 1, 1, 1, 1,
-	//	1, 1, 1, 1, 1,
-	//	1, 1, 1, 1, 1,
-	//	1, 1, 1, 1, 1,
-	//	1, 1, 1, 1, 1,
-	//	2, 1, 1, 1, 1,
-	//	3, 4, 1, 1, 1,
-	//	1, 1, 1, 2, 3,
-	//	1, 1, 1, 1, 4
-	//};
-	//const T w = 5, h = 5;
-	//T arr[w * h] = {
-	//	3, 3, 3, 1, 0,
-	//	3, 2, 4, 1, 3,
-	//	4, 2, 2, 1, 2,
-	//	0, 0, 4, 4, 4,
-	//	0, 0, 1, 4, 3
-	//};
-	//vector<T> vec(arr, (T*)((char*)arr + sizeof(arr)));
-	//matrix<T> source(w, h);
-	//auto iter = vec.begin();
-	//for (auto i = source.begin(), end = source.end(); i != end; i++, iter++) *i = *iter;
-	//change_to_matrix_that_may_be_parsed_to_res(source);
-	//////////////////////////
-	//matrix< array<pair<T, bool>, 3> > res_(w, h);
-	//print (source, res_);
-	//system("pause");
-
-	//////////////////////////
-	const T w = 50, h = 50;
-	matrix<T> source = gen_sourse_data(w, h, 5);
+		const T w = 100, h = 100;
+		matrix<T> source = gen_sourse_data(w, h, 10);
 	#endif
 	#ifdef WRITE
-	ofstream out_stream(buffer);
-	out_stream << w << ' ' << h;
-	T j = 0;
-	for (const auto& i : source){
-		if ((j++ % w) == 0) out_stream << '\n';
-		out_stream << i << ' ';
-	}
-	out_stream.close();
+		ofstream out_stream(buffer);
+		out_stream << w << ' ' << h;
+		T j = 0;
+		for (const auto& i : source){
+			if ((j++ % w) == 0) out_stream << '\n';
+			out_stream << i << ' ';
+		}
+		out_stream.close();
 	#endif
 	#ifdef SOLVE
-	
-	auto start_time = clock();
-	matrix< array<pair<T, bool>, 3> > res = get_textures_arrangement(source);
-	double time = (clock() - start_time) / double(1000);
-
-
-	auto diff = difference(source, res_to_source(res));
-	cout << "w = " << w << "; h = " << h << ";" << endl;
-	cout << "time is " << time << " second" << endl;
-	cout << "difference is " << diff << " = " << (diff / (float)(w * h)) * 100 << "%" << endl << endl;
-	#ifdef PRINT_SOLUTION
-		ofstream solution_stream(solution);
-		cout.rdbuf(solution_stream.rdbuf());
 		cout << "w = " << w << "; h = " << h << ";" << endl;
+		auto start_time = clock();
+		matrix< array<pair<T, bool>, 3> > res = get_textures_arrangement(source);
+		double time = (clock() - start_time) / double(1000);
+
+
+		auto diff = difference(source, res_to_source(res));
 		cout << "time is " << time << " second" << endl;
 		cout << "difference is " << diff << " = " << (diff / (float)(w * h)) * 100 << "%" << endl << endl;
-		print(source, res);
-		solution_stream.close();
-	#endif
+		#ifdef PRINT_SOLUTION
+			ofstream solution_stream(solution);
+			cout.rdbuf(solution_stream.rdbuf());
+			cout << "w = " << w << "; h = " << h << ";" << endl;
+			cout << "time is " << time << " second" << endl;
+			cout << "difference is " << diff << " = " << (diff / (float)(w * h)) * 100 << "%" << endl << endl;
+			print(source, res);
+			solution_stream.close();
+		#endif
 
-	system("pause");
+		system("pause");
 	#endif
 }
