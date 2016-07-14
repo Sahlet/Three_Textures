@@ -4,6 +4,7 @@
 #include <string>
 #include <memory>
 #include <fstream>
+#include <ctime>
 
 void print(const matrix< T >& source, const matrix< array<pair<T, bool>, 3> >& res){
 	T w = source.get_w(), h = source.get_h();
@@ -64,7 +65,7 @@ void print(const matrix< array<pair<T, bool>, 3> >& res){
 	print(res_to_source(res), res);
 }
 
-#define READ
+//#define READ
 #define WRITE
 #define SOLVE
 #define PRINT_SOLUTION
@@ -140,7 +141,7 @@ int main(){
 	//system("pause");
 
 	//////////////////////////
-	const T w = 20, h = 20;
+	const T w = 50, h = 50;
 	matrix<T> source = gen_sourse_data(w, h, 5);
 	#endif
 	#ifdef WRITE
@@ -155,17 +156,23 @@ int main(){
 	#endif
 	#ifdef SOLVE
 	
+	auto start_time = clock();
 	matrix< array<pair<T, bool>, 3> > res = get_textures_arrangement(source);
+	double time = (clock() - start_time) / double(1000);
 
 
 	auto diff = difference(source, res_to_source(res));
+	cout << "w = " << w << "; h = " << h << ";" << endl;
+	cout << "time is " << time << " second" << endl;
 	cout << "difference is " << diff << " = " << (diff / (float)(w * h)) * 100 << "%" << endl << endl;
 	#ifdef PRINT_SOLUTION
-	ofstream solution_stream(solution);
-	cout.rdbuf(solution_stream.rdbuf());
-	cout << "difference is " << diff << " = " << (diff / (float)(w * h)) * 100 << "%" << endl << endl;
-	print(source, res);
-	solution_stream.close();
+		ofstream solution_stream(solution);
+		cout.rdbuf(solution_stream.rdbuf());
+		cout << "w = " << w << "; h = " << h << ";" << endl;
+		cout << "time is " << time << " second" << endl;
+		cout << "difference is " << diff << " = " << (diff / (float)(w * h)) * 100 << "%" << endl << endl;
+		print(source, res);
+		solution_stream.close();
 	#endif
 
 	system("pause");
