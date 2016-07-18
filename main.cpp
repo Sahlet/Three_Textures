@@ -70,7 +70,7 @@ void print(const matrix< array<pair<T, bool>, 3> >& res){
 	print(res_to_source(res), res);
 }
 
-//#define READ
+#define READ
 //#define WRITE
 #define SOLVE
 //#define PRINT_SOLUTION
