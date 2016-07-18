@@ -1,6 +1,5 @@
 ﻿//Average_Textures.cpp
 
-
 #include "Average_Textures.h"
 #include <iostream>
 #include <list>
@@ -234,7 +233,7 @@ private:
 	vector< info* > neighbors;
 	//template<> struct less< INFO >
 	struct INFO_less{
-		bool operator()(const INFO & l_INFO, const INFO & r_INFO){
+		bool operator()(const INFO & l_INFO, const INFO & r_INFO) const {
 			for (T i = 0; i < NUMBER_OF_LEVELS; i++){
 				if (!(l_INFO[i] == r_INFO[i])) return l_INFO[i] < r_INFO[i];
 			}
@@ -580,7 +579,7 @@ matrix< array<pair<T, bool>, 3> > get_textures_arrangement(const matrix<T>& sour
 		node goal;//целевой узел
 		list< node > usable_nodes/*еще могут менять уровень*/;
 		matrix< info/*< TAG >*/ > m;//хранит
-		sub_matrix(/*const node& barrier, */const matrix< info/*< TAG >*/ > infos, const node& n_, T max_distance_x, T max_distance_y, const T& max_count_of_usable) :
+		sub_matrix(/*const node& barrier, */const matrix< info/*< TAG >*/ >& infos, const node& n_, T max_distance_x, T max_distance_y, const T& max_count_of_usable) :
 			m(1 + min(T(1 + max_distance_x), n_.x) + min(max_distance_y, T(infos.get_w() - 1 - n_.x)), 1 + min(T(1 + max_distance_y), n_.y) + min(1 + max_distance_x, infos.get_h() - 1 - n_.y))
 		{
 			node n1, n2, *n_ptr, LU_point(n_.x - min(T(1 + max_distance_x), n_.x), n_.y - min(T(1 + max_distance_y), n_.y));
