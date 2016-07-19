@@ -15,6 +15,7 @@ public:
 	typedef typename std::vector<Type>::const_iterator const_iterator;
 	matrix(const T& width, const T& height)  : w(width), h(height), vec(w*h){}
 	matrix(matrix&& m) : w(m.w), h(m.h), vec(std::move(m.vec)){}
+	matrix(const matrix& m) : w(m.w), h(m.h), vec(m.vec) {}
 	matrix& operator = (matrix&& m){
 		w = m.w;
 		h = m.h;
