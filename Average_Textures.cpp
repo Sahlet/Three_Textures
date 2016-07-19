@@ -165,7 +165,7 @@ void change_to_matrix_that_may_be_parsed_to_res(matrix< T >& res){
 
 const T max_T = /*T(0u - 1)*/ _UI32_MAX;
 const T MAX_DISTANCE = 4, MIN_DISTANCE = 1;
-const T MAX_COUNT_OF_USABLE = 15;
+const T MAX_COUNT_OF_USABLE = 50;
 
 typedef bool TAG;
 //template<class TAG = void*>
@@ -470,7 +470,7 @@ public:
 		}
 
 		cerr << "impossible happened in set_and_use_the_most_popular_texture_from_neighbours" << endl;
-		//throw exception();
+		throw exception();
 	}
 	void set_neighbors(const node& n, matrix<info /*< TAG >*/ >& owner){
 		auto neighbors_x_y = make_neighbors(n, owner.get_w(), owner.get_h());
@@ -560,7 +560,14 @@ template<class Type> struct value_saver{
 	}
 };
 
+#include <fstream>
+
 matrix< array<pair<T, bool>, 3> > get_textures_arrangement(matrix<T>& source) {
+	/*auto err = ofstream("Three_Textures_ERRORs.txt");
+	cerr.rdbuf(err.rdbuf());*/
+	/*auto out = ofstream("Three_Textures_out.txt");
+	cout.rdbuf(out.rdbuf());*/
+
 	T w = source.get_w(), h = source.get_h();
 	matrix< info/*< TAG >*/ > infos(w, h);
 
@@ -669,6 +676,30 @@ matrix< array<pair<T, bool>, 3> > get_textures_arrangement(matrix<T>& source) {
 				iter.next();
 			}
 
+
+			//////////////////////////////////////////////жесткая проверка на правильность работы
+			if (LU_point.y > 0) {
+				for (size_t x = 0; x < m.get_w(); x++) {
+					infos(LU_point.x + x, LU_point.y - 1).clear();
+					infos(LU_point.x + x, LU_point.y - 1).use();
+				}
+			}
+
+			if (LU_point.x > 0) {
+				for (size_t y = 0; y < m.get_h(); y++) {
+					infos(LU_point.x - 1, LU_point.y + y).clear();
+					infos(LU_point.x - 1, LU_point.y + y).use();
+				}
+			}
+
+			//еще подумать над размерами матрицы
+
+			cur = start;
+			while (!(cur > goal)) {
+				infos(LU_point.x + x, LU_point.y + y).clear();
+				infos(LU_point.x + x, LU_point.y + y).use();
+				iter.next();
+			}
 		}
 	};
 
@@ -807,7 +838,15 @@ matrix< array<pair<T, bool>, 3> > get_textures_arrangement(matrix<T>& source) {
 				}
 				inf->tag = true;
 				if (n.y > 0 && !infos(n.x, n.y - 1).tag) right.reset(new edge(infos, node(n.x, n.y - 1)/*, solved*/));
-				if (n.x > 0 && n.y + 1 < infos.get_h() && !infos(n.x - 1, n.y + 1).tag) left.reset(new edge(infos, node(n.x - 1, n.y + 1)/*, solved*/));
+					//добавлено
+					else if (n.y > 0 && n.x + 1 > infos.get_w() && !infos(n.x + 1, n.y - 1).tag) right.reset(new edge(infos, node(n.x + 1, n.y - 1)));
+					else if (n.x + 1 > infos.get_w() && !infos(n.x + 1, n.y).tag) right.reset(new edge(infos, node(n.x + 1, n.y)));
+
+				//if (n.x > 0 && n.y + 1 < infos.get_h() && !infos(n.x - 1, n.y + 1).tag) left.reset(new edge(infos, node(n.x - 1, n.y + 1)/*, solved*/));
+					//добавлено
+					if (n.x > 0 && !infos(n.x - 1, n.y).tag) right.reset(new edge(infos, node(n.x - 1, n.y)));
+					else if (n.x > 0 && n.y + 1 < infos.get_h() && !infos(n.x - 1, n.y + 1).tag) left.reset(new edge(infos, node(n.x - 1, n.y + 1)/*, solved*/));
+					else if (n.y + 1 > infos.get_h() && !infos(n.x, n.y + 1).tag) right.reset(new edge(infos, node(n.x, n.y + 1)));
 			}
 			edge(edge&& e) : inf(e.inf), /*solved(e.solved), */left(std::move(e.left)), right(std::move(e.right)) {
 				e.inf = nullptr;
@@ -914,7 +953,19 @@ matrix< array<pair<T, bool>, 3> > get_textures_arrangement(matrix<T>& source) {
 			//bool solved = false used;
 			bool used;
 
-			//static int i = 0;
+			static int i = 0;
+
+			if (i == 0) {
+				int i = 0;
+			}
+
+			if (i == 40) {
+				int i = 0;
+			}
+
+			if (i == 41) {
+				int i = 0;
+			}
 
 			for (T y = 0; y < h; y++){
 				for (T x = 0; x < w; x++){
@@ -941,7 +992,7 @@ matrix< array<pair<T, bool>, 3> > get_textures_arrangement(matrix<T>& source) {
 				T last_distance = last.distance(m.goal);
 				last = root_node;
 
-				if (distance != root_node.distance(m.goal)){
+				/*if (distance != root_node.distance(m.goal)){
 					distance = root_node.distance(m.goal);
 					if (m.goal.x < max_x && m.goal.y > (1 + !m.top)){
 						for (T i = 0, y = m.goal.y - min(T(m.goal.y - !m.top), distance); (y + 2 <= m.goal.y) && m.m(m.goal.x + 1, y).was_used(); y++, i++){
@@ -950,14 +1001,15 @@ matrix< array<pair<T, bool>, 3> > get_textures_arrangement(matrix<T>& source) {
 							}
 						}
 					}
-				}
+				}*/
 
 				node n1(root_node.x, root_node.y + 1), n2, *n_ptr = &n1;
 
 				for (; *n_ptr != root_node; last_distance++){
 					n1.y = min(T(m.goal.y + last_distance), max_y);
 					n1.x = (m.goal.x >= last_distance) ? m.goal.x - last_distance : n1.y = 0;
-					n2.x = m.goal.x;
+					//n2.x = m.goal.x;
+						n2.x = min(T(m.goal.x + (last_distance > 0 ? last_distance - 1 : 0)), max_x);//добавлено
 					n2.y = (m.top ? (m.goal.y >= last_distance) : (m.goal.y > last_distance)) ? m.goal.y - last_distance : n2.x = 0;
 					do{
 						n_ptr = n1 > n2 ? &n1 : &n2;//надо, чтоб было в начале цикла
@@ -1015,7 +1067,8 @@ matrix< array<pair<T, bool>, 3> > get_textures_arrangement(matrix<T>& source) {
 							//		//cout << "true " << ++i << endl;
 							//		return true;
 							//}
-							return true;
+								cout << "true " << ++i << endl;
+								return true;//добавлено
 							if (iter->first.next_use()) continue;
 						} else {
 							if (iter == enumerating_nodes.begin()){
@@ -1032,7 +1085,7 @@ matrix< array<pair<T, bool>, 3> > get_textures_arrangement(matrix<T>& source) {
 					}
 				} while (m[root_node].use());
 			}
-			//cout << "false " << ++i << endl;
+			cout << "false " << ++i << endl;
 			return false;
 		}
 	};
