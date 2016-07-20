@@ -91,7 +91,7 @@ int main(){
 		in_stream.close();
 	#else
 		const T w = 100, h = 100;
-		matrix<T> source = gen_sourse_data(w, h, 4);
+		matrix<T> source = gen_sourse_data(w, h, 5);
 	#endif
 	#ifdef WRITE
 		ofstream out_stream(buffer);
