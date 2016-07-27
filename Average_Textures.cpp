@@ -204,8 +204,7 @@ public:
 			if (texture == max_T){
 				cerr << "if (texture == max_T)" << endl;
 			}
-			if (this->texture == max_T || this->texture == texture) return true;
-			return false;
+			return this->texture == max_T || this->texture == texture;
 		}
 		inline void give(const T& texture){
 			if (!can_give(texture)){
@@ -235,6 +234,7 @@ public:
 			this->l = l;
 			return *this;
 		}
+		operator bool() { return bool(l); }
 	};
 private:
 	bool free;//показывает, является ли этот узел таким, что вокруг него много узлов с таким же цветом
@@ -263,11 +263,13 @@ private:
 		if (filling[l/2].can_give(texture)) return true;
 		return false;
 	}
-	inline void give(const char& l, const T& texture){
+	inline bool give(const char& l, const T& texture){
 		if (!can_give(l, texture)){
 			cerr << "if (!can_give(l, texture))" << endl;
+			return false;
 		}
 		filling[l/2].give(texture);
+		return true;
 	}
 	
 	void remove_from_the_level(){
@@ -484,6 +486,24 @@ public:
 			neighbors[i] = &owner(iter->x, iter->y);
 		}
 	}
+	bool refresh_filling() {
+		struct fix_if_not_OK{
+			bool OK;
+			INFO& filling;
+			INFO old_filling;
+			fix_if_not_OK(INFO& filling) : OK(true), filling(filling), old_filling(filling) {}
+			~fix_if_not_OK() {
+				if (!OK) filling = old_filling;
+			}
+		} fixer(filling);
+		filling = INFO();
+		for (auto i : neighbors){
+			if (!i->cur_level) continue;
+			if(!(fixer.OK = this->give(i->cur_level.l, i->cur_level.texture))) break;
+		}
+		if (fixer.OK && this->cur_level) fixer.OK = this->give(this->cur_level.l, this->cur_level.texture);
+		return fixer.OK;
+	}
 	inline Level get_cur_level(){ return cur_level; }
 	inline T get_texture(){ return cur_level.texture; }
 	inline T operator[](const size_t& i){ return filling[i].get_texture(); }
@@ -552,75 +572,45 @@ template<class Type> struct value_saver{
 
 //#include <fstream>
 
-matrix< array<pair<T, bool>, 3> > get_textures_arrangement(matrix<T>& source) {
-	/*auto err = ofstream("Three_Textures_ERRORs.txt");
-	cerr.rdbuf(err.rdbuf());*/
-	/*auto out = ofstream("Three_Textures_out.txt");
-	cout.rdbuf(out.rdbuf());*/
+struct funcs{
 
-	matrix< info/*< TAG >*/ > infos(source.get_w() + 2, source.get_h() + 2);
-
-	change_to_matrix_that_may_be_parsed_to_res(source);
-
-	//инициализация
-	{
-		node cur;
-		T &x = cur.x, &y = cur.y;
-		auto iter = source.begin();
-		for (y = 1; y <= source.get_h(); y++) {
-			for (x = 1; x <= source.get_w(); x++, iter++) {
-				(infos(x, y) = info/*< TAG >*/(*iter)).set_neighbors(cur, infos);
-			}
-		}
-		for (y = 0; y < infos.get_h(); y++) {
-			infos(0, y).set_neighbors(node (0, y), infos);
-			infos(infos.get_w() - 1, y).set_neighbors(node(infos.get_w() - 1, y), infos);
-		}
-		for (x = 1; x < infos.get_w() - 1; x++) {
-			infos(x, 0).set_neighbors(node(x, 0), infos);
-			infos(x, infos.get_h() - 1).set_neighbors(node(x, infos.get_h() - 1), infos);
-		}
-	}
-	info/*< TAG >*/::set_free(infos);
-	
-	struct funcs{
-
-		struct next_pred{
-			const node& start, &end;
-			node &cur;
-			next_pred(const node& start, const node &end, node &cur) : start(start), end(end), cur(cur){}
-			void pred(){
-				if (cur.x > start.x && cur.y < end.y){
-					cur.x--; cur.y++;
+	struct next_pred{
+		const node& start, &end;
+		node &cur;
+		next_pred(const node& start, const node &end, node &cur) : start(start), end(end), cur(cur){}
+		void pred(){
+			if (cur.x > start.x && cur.y < end.y){
+				cur.x--; cur.y++;
+			} else {
+				T diagonal = cur.x + cur.y;
+				if (diagonal <= end.x + start.y){
+					cur.y = start.y;
+					cur.x = diagonal - cur.y - 1;
 				} else {
-					T diagonal = cur.x + cur.y;
-					if (diagonal <= end.x + start.y){
-						cur.y = start.y;
-						cur.x = diagonal - cur.y - 1;
-					} else {
-						cur.x = end.x;
-						cur.y = diagonal - cur.x - 1;
-					}
+					cur.x = end.x;
+					cur.y = diagonal - cur.x - 1;
 				}
 			}
-			void next(){
-				if (cur.x < end.x && cur.y > start.y){
-					cur.x++; cur.y--;
+		}
+		void next(){
+			if (cur.x < end.x && cur.y > start.y){
+				cur.x++; cur.y--;
+			} else {
+				T diagonal = cur.x + cur.y;
+				if (diagonal < end.y + start.x){
+					cur.x = start.x;
+					cur.y = diagonal - cur.x + 1;
 				} else {
-					T diagonal = cur.x + cur.y;
-					if (diagonal < end.y + start.x){
-						cur.x = start.x;
-						cur.y = diagonal - cur.x + 1;
-					} else {
-						cur.y = end.y;
-						cur.x = diagonal - cur.y + 1;
-					}
+					cur.y = end.y;
+					cur.x = diagonal - cur.y + 1;
 				}
 			}
-		};
+		}
+	};
 	class sub_matrix{
 		matrix< info/*< TAG >*/ >& infos;
 		matrix< info/*< TAG >*/ > m;//хранит
+		const node start, end;
 		const node LU_point;
 		const node goal;//целевой узел
 		list< node > usable_nodes/*еще могут менять уровень*/;
@@ -743,14 +733,20 @@ matrix< array<pair<T, bool>, 3> > get_textures_arrangement(matrix<T>& source) {
 		sub_matrix(const sub_matrix&);
 	public:
 		//прямоугольник [real_goal.x - l_distance - 1; real_goal.x + r_distance + 1] X [real_goal.y - t_distance - 1; real_goal.y + b_distance + 1] должен входить в infos
-		sub_matrix(matrix< info/*< TAG >*/ >& infos, const node& real_goal, const T l_distance, const T r_distance, const T t_distance, const T b_distance, const T& max_count_of_usable) :
+		sub_matrix(matrix< info/*< TAG >*/ >& infos, const node& real_goal, T l_distance, const T r_distance, T t_distance, const T b_distance, const T& max_count_of_usable) :
 			infos(infos),
-			m(1 + ((l_distance + 1) + (min(T(r_distance + 1), max(t_distance, T(1))))),
-			  1 + ((t_distance + 1) + (min(b_distance, l_distance) + 1))),
-			LU_point(real_goal.x - (1 + l_distance), real_goal.y - (1 + t_distance)),
-			goal((1 + l_distance), (1 + t_distance))
+			m(1 + ((min(real_goal.x, l_distance) + 1) + (min(T(infos.get_w() - real_goal.x), min(T(r_distance + 1), max(t_distance, T(1)))))),
+			  1 + ((min(real_goal.y, t_distance) + 1) + (min(T(infos.get_h() - real_goal.y), T(min(b_distance, l_distance) + 1))))),
+			
+			start(	(real_goal.x <= l_distance) ? 1 : 0,
+					(real_goal.y <= t_distance) ? 1 : 0),
+			end((T(infos.get_w() - real_goal.x) <= min(T(r_distance + 1), max(t_distance, T(1)))) ? (m.get_w() - 2) : (m.get_w() - 1),
+				(T(infos.get_h() - real_goal.y) <= T(min(b_distance, l_distance) + 1)) ? (m.get_h() - 2) : (m.get_h() - 1)),
+
+			LU_point(real_goal.x - min(real_goal.x, T(1 + l_distance)), real_goal.y - min(real_goal.y, T(1 + t_distance))),
+			goal((1 + min(real_goal.x, l_distance)), (1 + min(real_goal.y, t_distance)))
 		{
-			node start, end(m.get_w() - 1, m.get_h() - 1), cur;
+			node cur(start);
 			T &x = cur.x, &y = cur.y;
 			next_pred iter(start, end, cur);
 			while (!(cur > end)){
@@ -758,7 +754,14 @@ matrix< array<pair<T, bool>, 3> > get_textures_arrangement(matrix<T>& source) {
 				iter.next();
 			}
 
+			if (start.x) for (y = 0, x = 0; y < m.get_h(); y++) { m(x, y).set_neighbors(cur, m); m(x, y).refresh_filling(); }
+			if (start.y) for (x = 0, y = 0; x < m.get_w(); x++) { m(x, y).set_neighbors(cur, m); m(x, y).refresh_filling(); }
+			if (end.x == m.get_w() - 2) for (y = 0, x = m.get_w() - 1; y < m.get_h(); y++) { m(x, y).set_neighbors(cur, m); m(x, y).refresh_filling(); }
+			if (end.y == m.get_h() - 2) for (x = 0, y = m.get_h() - 1; x < m.get_w(); x++) { m(x, y).set_neighbors(cur, m); m(x, y).refresh_filling(); }
+
 			node n1, n2, *n_ptr;
+			l_distance = min(real_goal.x, l_distance);
+			t_distance = min(real_goal.y, t_distance);
 			T new_max_y = m.get_h() - 2, max_distance = max(l_distance, t_distance);
 
 			for (T distance = max(T(MIN_DISTANCE), T(1)); distance <= max_distance && usable_nodes.size() < max_count_of_usable; distance++){
@@ -780,7 +783,7 @@ matrix< array<pair<T, bool>, 3> > get_textures_arrangement(matrix<T>& source) {
 		}
 		info/*< TAG >*/& operator[](const node& n){return m(n.x, n.y);}
 		void save(){
-			node start, end(m.get_w() - 1, m.get_h() - 1), cur;
+			node cur = start;
 			T &x = cur.x, &y = cur.y;
 			
 			next_pred iter(start, end, cur);
@@ -792,14 +795,14 @@ matrix< array<pair<T, bool>, 3> > get_textures_arrangement(matrix<T>& source) {
 
 
 			//////////////////////////////////////////////жесткая проверка на правильность работы
-			/*start = node(1, 1);
-			end.x--; end.y--;
+			/*
 			cur = start;
 			while (!(cur > goal)) {
 				infos(LU_point.x + x, LU_point.y + y).clear();
 				infos(LU_point.x + x, LU_point.y + y).use();
 				iter.next();
-			}*/
+			}
+			*/
 		}
 		bool solve_the_problem() {
 
@@ -936,133 +939,155 @@ matrix< array<pair<T, bool>, 3> > get_textures_arrangement(matrix<T>& source) {
 			return false;
 		}
 	};
-		
-		//работает только с "обрамленными" матрицами
-		static bool fill_infos(matrix< info/*< TAG >*/ >& infos, node start, const node& goal, const node& end, const bool& may_change_texture = false){
-			node cur = start;
-			T &x = cur.x, &y = cur.y, w = end.x - start.x + 1, h = end.y - start.y + 1;
+	
+	static bool fill_infos(matrix< info/*< TAG >*/ >& infos, node start, const node& goal, const node& end, const bool& may_change_texture = false){
+		node cur = start;
+		T &x = cur.x, &y = cur.y, w = end.x - start.x + 1, h = end.y - start.y + 1;
 
-			next_pred iter(start, end, cur);
+		next_pred iter(start, end, cur);
 
-			while (!(goal < cur)){
-				if (infos(x, y).use()) infos(x, y).remember();
-				else {
-					info* problem_info = &infos(x, y);
-					bool solved = false;
-					auto problem_node = cur;
-					#pragma region try_to_solve
-					{
-						////сохранение имеющегося результата (маленькая область)
-						//sub_matrix saver(/*barrier, */infos, problem_node, min(1, x - start.x) + 1, min(1, y - start.y) + 1, 0);
-						//sub_matrix saver(/*barrier, */infos, problem_node, min(2, x - start.x) + 1, min(2, y - start.y) + 1, 0);
+		while (!(goal < cur)){
+			if (infos(x, y).use()) infos(x, y).remember();
+			else {
+				info* problem_info = &infos(x, y);
+				bool solved = false;
+				auto problem_node = cur;
+				#pragma region try_to_solve
+				{
+					////сохранение имеющегося результата (маленькая область)
+					//sub_matrix saver(/*barrier, */infos, problem_node, min(1, x - start.x) + 1, min(1, y - start.y) + 1, 0);
+					//sub_matrix saver(/*barrier, */infos, problem_node, min(2, x - start.x) + 1, min(2, y - start.y) + 1, 0);
 						
-						/*тут барьер использовать не надо потому, что маленькая сложность*/
-						value_saver< node > old_start(start);
-						value_saver< node > old_cur(cur);
-						//прежде чем менять, подумай!(сейчас все ок)
-						//тут устанавливается новый старт, чтоб перебрать ближайшие узлы для решения проблемы
-						auto neighbors = make_neighbors(x - old_start.value.x, y - old_start.value.y, w, h, (neighbor_number)(N1 | N2 | N7 | N8));//приходит список соседей в порядке по часовой стрелке начиная с первого (смотри make_neighbors)
+					/*тут барьер использовать не надо потому, что маленькая сложность*/
+					value_saver< node > old_start(start);
+					value_saver< node > old_cur(cur);
+					//прежде чем менять, подумай!(сейчас все ок)
+					//тут устанавливается новый старт, чтоб перебрать ближайшие узлы для решения проблемы
+					auto neighbors = make_neighbors(x - old_start.value.x, y - old_start.value.y, w, h, (neighbor_number)(N1 | N2 | N7 | N8));//приходит список соседей в порядке по часовой стрелке начиная с первого (смотри make_neighbors)
+					if (neighbors.size()){
+						for (const auto &i : neighbors){
+							if (i < *neighbors.begin()) *neighbors.begin() = i;
+						}
+						start = node(neighbors.begin()->x + old_start.value.x, neighbors.begin()->y + old_start.value.y);
+						neighbors = make_neighbors(start.x - old_start.value.x, start.y - old_start.value.y, 1 + end.x - old_start.value.x, 1 + end.y - old_start.value.x, (neighbor_number)(N1 | N2 | N7 | N8));//приходит список соседей в порядке по часовой стрелке начиная с первого
 						if (neighbors.size()){
-							for (const auto &i : neighbors){
-								if (i < *neighbors.begin()) *neighbors.begin() = i;
+							for (const auto &j : neighbors){
+								if (j < *neighbors.begin()) *neighbors.begin() = j;
 							}
 							start = node(neighbors.begin()->x + old_start.value.x, neighbors.begin()->y + old_start.value.y);
-							neighbors = make_neighbors(start.x - old_start.value.x, start.y - old_start.value.y, 1 + end.x - old_start.value.x, 1 + end.y - old_start.value.x, (neighbor_number)(N1 | N2 | N7 | N8));//приходит список соседей в порядке по часовой стрелке начиная с первого
-							if (neighbors.size()){
-								for (const auto &j : neighbors){
-									if (j < *neighbors.begin()) *neighbors.begin() = j;
-								}
-								start = node(neighbors.begin()->x + old_start.value.x, neighbors.begin()->y + old_start.value.y);
-							}
 						}
-						#pragma region fill_infos_SOLVING()
-						#define fill_infos_SOLVING()\
-						{\
-							bool use = false;\
-							while(!solved){\
-								while (cur != start){\
-									infos(x, y).clear();\
-									iter.pred();\
-									use = infos(x, y).use();\
-									if (use){\
-										infos(x, y).remember();\
-										break;\
-									}\
+					}
+					#pragma region fill_infos_SOLVING()
+					#define fill_infos_SOLVING()\
+					{\
+						bool use = false;\
+						while(!solved){\
+							while (cur != start){\
+								infos(x, y).clear();\
+								iter.pred();\
+								use = infos(x, y).use();\
+								if (use){\
+									infos(x, y).remember();\
+									break;\
 								}\
-								if (!use) break;\
-								while (cur < problem_node){\
-									iter.next();\
-									if (infos(x, y).use()) infos(x, y).remember();\
-									else break;\
-								}\
-								if (cur == problem_node && problem_info->was_used()) solved = true;\
 							}\
-						}
-						#pragma endregion
-						
-						fill_infos_SOLVING();
-						
-						//if (!solved) saver.save_to(infos, problem_node);
-						
-						//следующий if вместо сохранения старой расстановки в saver (так быстрее)
-						if (!solved && problem_node != start){
-							cur = start;
-							while (cur < problem_node){
-								infos(x, y).clear();
-								iter.next();
-							}
-							value_saver < node > old_problem_node(problem_node);
-							value_saver < info* > old_problem_info(problem_info);
-							iter.pred();
-							problem_node = cur;
-							problem_info = &infos(x, y);
-							cur = start;
-							iter.next();
-							fill_infos_SOLVING();
-							if (!solved) cerr << "if (!solved)" << endl;
-							solved = false;
-						}
+							if (!use) break;\
+							while (cur < problem_node){\
+								iter.next();\
+								if (infos(x, y).use()) infos(x, y).remember();\
+								else break;\
+							}\
+							if (cur == problem_node && problem_info->was_used()) solved = true;\
+						}\
 					}
 					#pragma endregion
-					
-					if (!solved && cur.distance(start) > 2){
-						sub_matrix sub_(infos, cur,
-							/*l_distance*/min(MAX_DISTANCE, T(x - start.x)),
-							/*r_distance*/end.x - x,
-							/*t_distance*/min(MAX_DISTANCE, T(y - start.y)),
-							/*b_distance*/end.y - y,
-							MAX_COUNT_OF_USABLE);
-						if (solved = sub_.solve_the_problem()) sub_.save();
-					}
-
-					if (!solved && may_change_texture){
-						problem_info->set_and_use_the_most_popular_texture_from_neighbors(cur, infos);
-						problem_info->remember();
-						solved = true;
-					}
-					
-					if (!solved){
+						
+					fill_infos_SOLVING();
+						
+					//if (!solved) saver.save_to(infos, problem_node);
+						
+					//следующий if вместо сохранения старой расстановки в saver (так быстрее)
+					if (!solved && problem_node != start){
 						cur = start;
 						while (cur < problem_node){
 							infos(x, y).clear();
 							iter.next();
 						}
-						return false;
+						value_saver < node > old_problem_node(problem_node);
+						value_saver < info* > old_problem_info(problem_info);
+						iter.pred();
+						problem_node = cur;
+						problem_info = &infos(x, y);
+						cur = start;
+						iter.next();
+						fill_infos_SOLVING();
+						if (!solved) cerr << "if (!solved)" << endl;
+						solved = false;
 					}
 				}
-				iter.next();
+				#pragma endregion
+					
+				if (!solved && cur.distance(start) > 2){
+					sub_matrix sub_(infos, cur,
+						/*l_distance*/min(MAX_DISTANCE, T(x - start.x)),
+						/*r_distance*/end.x - x,
+						/*t_distance*/min(MAX_DISTANCE, T(y - start.y)),
+						/*b_distance*/end.y - y,
+						MAX_COUNT_OF_USABLE);
+					if (solved = sub_.solve_the_problem()) sub_.save();
+				}
+
+				if (!solved && may_change_texture){
+					problem_info->set_and_use_the_most_popular_texture_from_neighbors(cur, infos);
+					problem_info->remember();
+					solved = true;
+				}
+					
+				if (!solved){
+					cur = start;
+					while (cur < problem_node){
+						infos(x, y).clear();
+						iter.next();
+					}
+					return false;
+				}
 			}
-			return true;
+			iter.next();
 		}
-		static bool fill_infos(matrix< info/*< TAG >*/ >& infos, const node start, const node& goal, const bool& may_change_texture = false) {
-			node end(goal.x, min(goal.y + goal.x - start.x, infos.get_h() - 1));
-			return fill_infos(infos, start, goal, end, may_change_texture);
+		return true;
+	}
+	static bool fill_infos(matrix< info/*< TAG >*/ >& infos, const node start, const node& goal, const bool& may_change_texture = false) {
+		node end(goal.x, min(goal.y + goal.x - start.x, infos.get_h() - 1));
+		return fill_infos(infos, start, goal, end, may_change_texture);
+	}
+};
+
+matrix< array<pair<T, bool>, 3> > get_textures_arrangement(matrix<T>& source) {
+	/*auto err = ofstream("Three_Textures_ERRORs.txt");
+	cerr.rdbuf(err.rdbuf());*/
+	/*auto out = ofstream("Three_Textures_out.txt");
+	cout.rdbuf(out.rdbuf());*/
+
+	change_to_matrix_that_may_be_parsed_to_res(source);
+
+	matrix< info/*< TAG >*/ > infos(source.get_w(), source.get_h());
+
+	//инициализация
+	{
+		node cur;
+		T &x = cur.x, &y = cur.y;
+		auto iter = source.begin();
+		for (y = 0; y < source.get_h(); y++) {
+			for (x = 0; x < source.get_w(); x++, iter++) {
+				(infos(x, y) = info/*< TAG >*/(*iter)).set_neighbors(cur, infos);
+			}
 		}
-	};
+	}
+	info/*< TAG >*/::set_free(infos);
 
-	funcs::fill_infos(infos, node(1, 1), node(infos.get_w() - 2, infos.get_h() - 2), node(infos.get_w() - 2, infos.get_h() - 2), true);
+	funcs::fill_infos(infos, node(0, 0), node(infos.get_w() - 1, infos.get_h() - 1), true);
 
-	return infos_to_res(infos, true);
+	return infos_to_res(infos, false);
 }
 
 //в первых двух аргументах приходит размерность ширина и высота, а третим количество текстур
