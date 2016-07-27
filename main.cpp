@@ -1,6 +1,6 @@
 //main.cpp
 #include <iostream>
-#include "Average_Textures.h"
+#include "Three_Textures\Average_Textures.h"
 #include <string>
 #include <memory>
 #include <fstream>
