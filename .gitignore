@@ -47,5 +47,7 @@ Temporary Items
 .apdisk
 
 #my ignor definition
+*.vcxproj
+*.filters
 Debug
 Release
