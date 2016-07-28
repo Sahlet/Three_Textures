@@ -9,7 +9,7 @@
 void print(const matrix< T >& source, const matrix< array<pair<T, bool>, 3> >& res){
 	T w = source.get_w(), h = source.get_h();
 
-	if (w != res.get_w() || h != res.get_h()) throw exception();
+	if (w != res.get_w() || h != res.get_h()) throw std::exception();
 
 	T max_n_textures_in_row, tmp, str_len = 6;
 	string s, space("  ");
@@ -56,7 +56,7 @@ void print(const matrix< T >& source, const matrix< array<pair<T, bool>, 3> >& r
 
 size_t difference(const matrix< T >& source1, const matrix< T >& source2){
 	T w = source1.get_w(), h = source1.get_h();
-	if (w != source2.get_w() || h != source2.get_h()) throw exception();
+	if (w != source2.get_w() || h != source2.get_h()) throw std::exception();
 	size_t res = 0;
 	for (T y = 0; y < h; y++){
 		for (T x = 0; x < w; x++){
@@ -79,31 +79,32 @@ int main(){
 	string buffer("buffer.txt");
 	string solution("solution.txt");
 	
+	//for (unsigned int test_number = 0; test_number <= 100000000; test_number) {
 
-	#ifdef READ
+#ifdef READ
 		T w, h;
 		ifstream in_stream(buffer);
 		in_stream >> w >> h;
 		matrix<T> source(w, h);
-		for (auto& i : source){
+		for (auto& i : source) {
 			in_stream >> i;
 		}
 		in_stream.close();
-	#else
+#else
 		const T w = 100, h = 100;
 		matrix<T> source = gen_sourse_data(w, h, 5);
-	#endif
-	#ifdef WRITE
+#endif
+#ifdef WRITE
 		ofstream out_stream(buffer);
 		out_stream << w << ' ' << h;
 		T j = 0;
-		for (const auto& i : source){
+		for (const auto& i : source) {
 			if ((j++ % w) == 0) out_stream << '\n';
 			out_stream << i << ' ';
 		}
 		out_stream.close();
-	#endif
-	#ifdef SOLVE
+#endif
+#ifdef SOLVE
 		cout << "w = " << w << "; h = " << h << ";" << endl;
 		auto start_time = clock();
 		matrix<T> source_copy(source);//эта матрица будет преобразована в такую, что в каждом квадрате 3х3 будет не больше 3 текстур
@@ -117,17 +118,19 @@ int main(){
 		cout << "time is " << time << " second" << endl;
 		cout << "full difference is " << diff1 << " = " << (diff1 / (float)(w * h)) * 100 << "%" << endl;
 		cout << "difference between source and 3x3 condition source is " << diff2 << " = " << (diff2 / (float)(w * h)) * 100 << "%" << endl << endl;
-		#ifdef PRINT_SOLUTION
-			ofstream solution_stream(solution);
-			cout.rdbuf(solution_stream.rdbuf());
-			cout << "w = " << w << "; h = " << h << ";" << endl;
-			cout << "time is " << time << " second" << endl;
-			cout << "full difference is " << diff1 << " = " << (diff1 / (float)(w * h)) * 100 << "%" << endl;
-			cout << "difference between source and 3x3 condition source is " << diff2 << " = " << (diff2 / (float)(w * h)) * 100 << "%" << endl << endl;
-			print(source, res);
-			solution_stream.close();
-		#endif
+#ifdef PRINT_SOLUTION
+		ofstream solution_stream(solution);
+		cout.rdbuf(solution_stream.rdbuf());
+		cout << "w = " << w << "; h = " << h << ";" << endl;
+		cout << "time is " << time << " second" << endl;
+		cout << "full difference is " << diff1 << " = " << (diff1 / (float)(w * h)) * 100 << "%" << endl;
+		cout << "difference between source and 3x3 condition source is " << diff2 << " = " << (diff2 / (float)(w * h)) * 100 << "%" << endl << endl;
+		print(source, res);
+		solution_stream.close();
+#endif
+#endif
 
-		system("pause");
-	#endif
+	//}
+
+	system("pause");
 }
