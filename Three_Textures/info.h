@@ -226,7 +226,7 @@ public:
 		memory = inf.memory;
 		free = inf.free;
 		tag = inf.tag;
-		cur_level = inf.cur_level;
+		cur_level.reset(new Level(*inf.cur_level));
 		levels = inf.levels;
 		return *this;
 	}
@@ -267,14 +267,14 @@ public:
 
 		//сначала пытаемся добавить текстуру на тот уровень, на котором есть такие же
 		if ((FIRST & can_be_cur) && filling[0].get_count()) *cur_level = FIRST;
-		else if ((SECOND & can_be_cur) && filling[0].get_count()) *cur_level = SECOND;
-		else if ((THIRD & can_be_cur) && filling[0].get_count()) *cur_level = THIRD;
+		else if ((SECOND & can_be_cur) && filling[1].get_count()) *cur_level = SECOND;
+		else if ((THIRD & can_be_cur) && filling[2].get_count()) *cur_level = THIRD;
 		else if (FIRST & can_be_cur)  *cur_level = FIRST;
 		else if (SECOND & can_be_cur) *cur_level = SECOND;
 		else if (THIRD & can_be_cur)  *cur_level = THIRD;
 		else {
 			std::cerr << "impossible" << std::endl;//потом удалить
-			//throw std::exception();
+												   //throw std::exception();
 		}
 
 		for (auto i : neighbors) {
