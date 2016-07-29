@@ -91,7 +91,7 @@ int main(){
 		}
 		in_stream.close();
 #else
-		const T w = 100, h = 100;
+		const T w = 10, h = 10;
 		matrix<T> source = gen_sourse_data(w, h, 5);
 #endif
 #ifdef WRITE

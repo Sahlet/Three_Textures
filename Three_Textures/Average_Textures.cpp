@@ -78,10 +78,10 @@ matrix< array<pair<T, bool>, 3> > infos_to_res(matrix< info/*< TAG >*/ >& infos,
 		for (T y = 0 + without_edge; y < h; y++){
 			auto& inf = infos(x, y);
 			auto& res_inf = res(x - without_edge, y - without_edge);
-			for (int i = 0; i < 3; i++) res_inf[i].first = inf[i] != max_T ? inf[i] : 0;
+			for (int i = 0; i < NUMBER_OF_LEVELS; i++) res_inf[i].first = ((inf[i] != max_T) ? inf[i] : 0);
 			if (!inf.get_cur_level().l){
 				cerr << "if (!inf.get_cur_level().l)" << endl;
-				throw std::exception();
+				//throw std::exception();
 			}
 			res_inf[inf.get_cur_level().l/2].second = true;
 		}
@@ -98,8 +98,7 @@ template<class Type> struct value_saver{
 	}
 };
 
-struct funcs{
-
+#pragma region problem_solving
 	struct next_pred{
 		const node& start, &end;
 		node &cur;
@@ -151,7 +150,7 @@ struct funcs{
 			edge(matrix< info /*< TAG >*/ >& infos, const node& n) : inf(&infos(n.x, n.y)){
 				if (inf->tag) {
 					cerr << "if (inf.tag)" << endl;
-					throw std::exception();
+					//throw std::exception();
 				}
 				inf->tag = true;
 				if (n.y > 0 && !infos(n.x, n.y - 1).tag) right.reset(new edge(infos, node(n.x, n.y - 1)));
@@ -256,7 +255,7 @@ struct funcs{
 
 				if (inf->was_used()) {
 					std::cerr << "if (inf->was_used())" << std::endl;
-					throw std::exception();
+					//throw std::exception();
 				}
 			}
 			~edge() {
@@ -386,7 +385,7 @@ struct funcs{
 
 				if (max_child == node(0, 0)) {
 					cerr << "if (max_kid == node(0, 0))" << endl;
-					throw std::exception();
+					//throw std::exception();
 				}
 
 				return max_child;
@@ -433,7 +432,7 @@ struct funcs{
 
 				if (!m(root_node.x, root_node.y).use()) {
 					cerr << "if (m[root_node].use())" << endl;
-					throw std::exception();
+					//throw std::exception();
 					continue;
 				}
 				m(root_node.x, root_node.y).remember();
@@ -487,7 +486,7 @@ struct funcs{
 		}
 	};
 	
-	static bool fill_infos(matrix< info/*< TAG >*/ >& infos, node start, const node& goal, const node& end, const bool& may_change_texture = false){
+	bool fill_infos(matrix< info/*< TAG >*/ >& infos, node start, const node& goal, const node& end, const bool& may_change_texture, const bool& quickly){
 		node cur = start;
 		T &x = cur.x, &y = cur.y, w = end.x - start.x + 1, h = end.y - start.y + 1;
 
@@ -570,14 +569,14 @@ struct funcs{
 						fill_infos_SOLVING();
 						if (!solved) {
 							cerr << "if (!solved)" << endl;
-							throw std::exception();
+							//throw std::exception();
 						}
 						solved = false;
 					}
 				}
 				#pragma endregion
 					
-				if (!solved && cur.distance(start) > 2){
+				if (!quickly && !solved && cur.distance(start) > 2){
 					sub_matrix sub_(infos, cur,
 						/*l_distance*/min(MAX_DISTANCE, T(x - start.x)),
 						/*r_distance*/end.x - x,
@@ -606,13 +605,13 @@ struct funcs{
 		}
 		return true;
 	}
-	static bool fill_infos(matrix< info/*< TAG >*/ >& infos, const node start, const node& goal, const bool& may_change_texture = false) {
+	bool fill_infos(matrix< info/*< TAG >*/ >& infos, const node start, const node& goal, const bool& may_change_texture, const bool& quickly) {
 		node end(goal.x, min(goal.y + goal.x - start.x, infos.get_h() - 1));
-		return fill_infos(infos, start, goal, end, may_change_texture);
+		return fill_infos(infos, start, goal, end, may_change_texture, quickly);
 	}
-};
-
-matrix< array<pair<T, bool>, 3> > get_textures_arrangement(matrix<T>& source) {
+#pragma endregion
+	
+matrix< array<pair<T, bool>, 3> > get_textures_arrangement(matrix<T>& source, bool quickly) {
 	/*auto err = ofstream("Three_Textures_ERRORs.txt");
 	cerr.rdbuf(err.rdbuf());*/
 	/*auto out = ofstream("Three_Textures_out.txt");
@@ -635,7 +634,7 @@ matrix< array<pair<T, bool>, 3> > get_textures_arrangement(matrix<T>& source) {
 	}
 	info/*< TAG >*/::set_free(infos);
 
-	funcs::fill_infos(infos, node(0, 0), node(infos.get_w() - 1, infos.get_h() - 1), true);
+	fill_infos(infos, node(0, 0), node(infos.get_w() - 1, infos.get_h() - 1), true, quickly);
 
 	return infos_to_res(infos, false);
 }

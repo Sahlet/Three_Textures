@@ -1,4 +1,4 @@
-//info.h
+п»ї//info.h
 #pragma once
 #include <iostream>
 
@@ -7,17 +7,20 @@
 #include "node.h"
 #include <array>
 #include <map>
+#include <set>
 #include <vector>
+#include <memory>
+
 
 typedef bool TAG;
 //template<class TAG = void*>
-class info {//информация про узел
+class info {//РёРЅС„РѕСЂРјР°С†РёСЏ РїСЂРѕ СѓР·РµР»
 public:
 	enum level : char { NONE = 0, FIRST = 1, SECOND = 2, THIRD = 4 };
 	TAG tag;
 	class Texture {
 		char count;
-		T texture;//значимые только те текстуры, которые не равны max_T
+		T texture;//Р·РЅР°С‡РёРјС‹Рµ С‚РѕР»СЊРєРѕ С‚Рµ С‚РµРєСЃС‚СѓСЂС‹, РєРѕС‚РѕСЂС‹Рµ РЅРµ СЂР°РІРЅС‹ max_T
 	public:
 		Texture() : count(), texture(max_T) {}
 		inline void operator --(int) {
@@ -27,21 +30,21 @@ public:
 			}
 			if (!count) {
 				std::cerr << "if (!count)" << std::endl;
-				throw std::exception();
+				//throw std::exception();
 			}
 			if (--count == 0) texture = max_T;
 		}
 		inline bool can_give(const T& texture)const {
 			if (texture == max_T) {
 				std::cerr << "if (texture == max_T)" << std::endl;
-				throw std::exception();
+				//throw std::exception();
 			}
 			return this->texture == max_T || this->texture == texture;
 		}
 		inline void give(const T& texture) {
 			if (!can_give(texture)) {
 				std::cerr << "if (!can_give(texture))" << std::endl;
-				throw std::exception();
+				//throw std::exception();
 			}
 			if (!count++) this->texture = texture;
 		}
@@ -61,21 +64,21 @@ public:
 		Level(const T& texture) : l(NONE), texture(texture) {
 			if (texture == max_T) {
 				std::cerr << "if (texture == max_T)" << std::endl;
-				throw std::exception();
+				//throw std::exception();
 			}
 		}
 		inline Level& operator = (const level& l) {
 			this->l = l;
 			return *this;
 		}
-		inline operator bool() { return bool(l); }
 	};
 private:
-	bool free;//показывает, является ли этот узел таким, что вокруг него много узлов с таким же цветом
-	level used;//уровни, что были использованы этим узлом
+	bool free;//РїРѕРєР°Р·С‹РІР°РµС‚, СЏРІР»СЏРµС‚СЃСЏ Р»Рё СЌС‚РѕС‚ СѓР·РµР» С‚Р°РєРёРј, С‡С‚Рѕ РІРѕРєСЂСѓРі РЅРµРіРѕ РјРЅРѕРіРѕ СѓР·Р»РѕРІ СЃ С‚Р°РєРёРј Р¶Рµ С†РІРµС‚РѕРј
+	level used;//СѓСЂРѕРІРЅРё, С‡С‚Рѕ Р±С‹Р»Рё РёСЃРїРѕР»СЊР·РѕРІР°РЅС‹ СЌС‚РёРј СѓР·Р»РѕРј
 	typedef std::array< Texture, NUMBER_OF_LEVELS> INFO;
-	INFO filling;//заполнение
-	Level cur_level;//показывает на каком уровне сейчас стоит 1
+	INFO filling;//Р·Р°РїРѕР»РЅРµРЅРёРµ
+	std::list< std::shared_ptr< Level > > levels;//СЃРїРёСЃРѕРє СѓСЂРѕРІРЅРµР№, РєРѕС‚РѕСЂС‹Рµ Р·Р°РЅРёРјР°РµС‚ СЌС‚РѕС‚ СѓР·РµР»
+	std::shared_ptr< Level > cur_level;//РїРѕРєР°Р·С‹РІР°РµС‚ РЅР° РєР°РєРѕРј СѓСЂРѕРІРЅРµ СЃРµР№С‡Р°СЃ СЃС‚РѕРёС‚ 1
 
 	std::vector< info* > neighbors;
 	//template<> struct less< INFO >
@@ -93,7 +96,7 @@ private:
 	inline bool can_give(const int& l, const T& texture) const {
 		if (!l) {
 			std::cerr << "if(!l)" << std::endl;
-			throw std::exception();
+			//throw std::exception();
 		}
 		if (filling[l / 2].can_give(texture)) return true;
 		return false;
@@ -101,7 +104,7 @@ private:
 	inline bool give(const char& l, const T& texture) {
 		if (!can_give(l, texture)) {
 			std::cerr << "if (!can_give(l, texture))" << std::endl;
-			throw std::exception();
+			//throw std::exception();
 			return false;
 		}
 		filling[l / 2].give(texture);
@@ -109,12 +112,12 @@ private:
 	}
 
 	void remove_from_the_level() {
-		if (!cur_level.l) return;
+		if (!cur_level->l) return;
 		for (auto i : neighbors) {
-			i->filling[cur_level.l / 2]--;
+			i->filling[cur_level->l / 2]--;
 		}
-		this->filling[cur_level.l / 2]--;
-		cur_level.l = NONE;
+		this->filling[cur_level->l / 2]--;
+		cur_level->l = NONE;
 	}
 	bool can_be_used(level& l) const {
 		if (free) return false;
@@ -130,135 +133,38 @@ private:
 			}
 		};
 
-		if ((l & FIRST) && !this->can_give(FIRST, cur_level.texture)) l = level(l ^ FIRST);
-		if ((l & SECOND) && !this->can_give(SECOND, cur_level.texture)) l = level(l ^ SECOND);
-		if ((l & THIRD) && !this->can_give(THIRD, cur_level.texture)) l = level(l ^ THIRD);
+		if ((l & FIRST) && !this->can_give(FIRST, cur_level->texture)) l = level(l ^ FIRST);
+		if ((l & SECOND) && !this->can_give(SECOND, cur_level->texture)) l = level(l ^ SECOND);
+		if ((l & THIRD) && !this->can_give(THIRD, cur_level->texture)) l = level(l ^ THIRD);
 
-		if ((l & FIRST) && !tmp_struct::func(neighbors, cur_level.texture, FIRST)) l = level(l ^ FIRST);
-		if ((l & SECOND) && !tmp_struct::func(neighbors, cur_level.texture, SECOND)) l = level(l ^ SECOND);
-		if ((l & THIRD) && !tmp_struct::func(neighbors, cur_level.texture, THIRD)) l = level(l ^ THIRD);
+		if ((l & FIRST) && !tmp_struct::func(neighbors, cur_level->texture, FIRST)) l = level(l ^ FIRST);
+		if ((l & SECOND) && !tmp_struct::func(neighbors, cur_level->texture, SECOND)) l = level(l ^ SECOND);
+		if ((l & THIRD) && !tmp_struct::func(neighbors, cur_level->texture, THIRD)) l = level(l ^ THIRD);
 
 		if (!l) return false;
 		return true;
 	}
 	inline bool check_on_free() {
-		//такую сложность можно позволить, так как эта функция будет редко вызываться
+		//С‚Р°РєСѓСЋ СЃР»РѕР¶РЅРѕСЃС‚СЊ РјРѕР¶РЅРѕ РїРѕР·РІРѕР»РёС‚СЊ, С‚Р°Рє РєР°Рє СЌС‚Р° С„СѓРЅРєС†РёСЏ Р±СѓРґРµС‚ СЂРµРґРєРѕ РІС‹Р·С‹РІР°С‚СЊСЃСЏ
 		for (auto i : neighbors) {
 			for (auto j : i->neighbors) {
-				if (j->cur_level.texture != cur_level.texture) return (free = false);
+				if (j->cur_level->texture != cur_level->texture) return (free = false);
 			}
 		}
 		free = true;
 		clear();
 		return true;
 	}
-public:
-
-	info() : free(false), used(NONE), filling(), tag() {}
-	info(const T& texture) : cur_level(texture), free(false), filling(), tag(), used(NONE) {}
-	info(const info& inf) :
-		cur_level(inf.cur_level),
-		used(inf.used),
-		filling(inf.filling),
-		memory(inf.memory),
-		free(inf.free),
-		tag(inf.tag) {}
-	info& operator=(const info& inf) {
-		used = inf.used;
-		filling = inf.filling;
-		memory = inf.memory;
-		free = inf.free;
-		tag = inf.tag;
-		cur_level = inf.cur_level;
-		return *this;
-	}
-	info(info&& inf) :
-		cur_level(inf.cur_level),
-		used(inf.used),
-		filling(inf.filling),
-		memory(std::move(inf.memory)),
-		free(inf.free),
-		tag(std::move(inf.tag)) {}
-	info& operator=(info&& inf) {
-		used = inf.used;
-		filling = inf.filling;
-		memory = std::move(inf.memory);
-		free = inf.free;
-		tag = std::move(inf.tag);
-		cur_level = inf.cur_level;
-		return *this;
-	}
-
-	inline bool can_be_used() const {
-		level l;
-		return can_be_used(l);
-	}
-	inline void clear() {
-		remove_from_the_level();
-		used = NONE;
-	}
-	//текстура должна стать на любой свободный уровень, который еще не использован
-	inline bool use() {
-		if (free) return true;
-		level can_be_cur;
-		if (!can_be_used(can_be_cur)) return false;
-
-		remove_from_the_level();
-
-		//сначала пытаемся добавить текстуру на тот уровень, на котором есть такие же
-		if ((FIRST & can_be_cur) && filling[0].get_count()) cur_level = FIRST;
-		else if ((SECOND & can_be_cur) && filling[0].get_count()) cur_level = SECOND;
-		else if ((THIRD & can_be_cur) && filling[0].get_count()) cur_level = THIRD;
-		else if (FIRST & can_be_cur)  cur_level = FIRST;
-		else if (SECOND & can_be_cur) cur_level = SECOND;
-		else if (THIRD & can_be_cur)  cur_level = THIRD;
-		else {
-			std::cerr << "impossible" << std::endl;//потом удалить
-			throw std::exception();
-		}
-
-		for (auto i : neighbors) {
-			i->give(cur_level.l, cur_level.texture);
-		}
-		this->give(cur_level.l, cur_level.texture);
-
-		used = level(used | cur_level.l);
-
-		return true;
-	}
-	inline bool was_used() {
-		return bool(used);
-	}
-
-	inline bool was_here() {
-		if (free) return true;
-		if (!used) {
-			std::cerr << "if (!used)" << std::endl;
-			throw std::exception();
-		}
-
-		return memory[filling] & cur_level.l;
-		//return false;
-	}
-	inline void remember() {
-		if (free) return;
-		auto& level_ = memory[filling];
-		level_ = level(level_ | cur_level.l);
-	}
-	inline void clear_memory() {
-		memory.clear();
-	}
-
 	void set_texture(const T& texcure) {
 		if (texcure == max_T) {
 			std::cerr << "if (texcure == max_T)" << std::endl;
-			throw std::exception();
+			//throw std::exception();
 		}
-		if (cur_level.texture != texcure) {
+		if (cur_level->texture != texcure) {
 			clear();
 			clear_memory();
-			cur_level.texture = texcure;
-			//не экономно, но по-другому сложно и это относительно редко используется (не жалко)
+			cur_level->texture = texcure;
+			//РЅРµ СЌРєРѕРЅРѕРјРЅРѕ, РЅРѕ РїРѕ-РґСЂСѓРіРѕРјСѓ СЃР»РѕР¶РЅРѕ Рё СЌС‚Рѕ РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅРѕ СЂРµРґРєРѕ РёСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ (РЅРµ Р¶Р°Р»РєРѕ)
 			for (auto i : neighbors) {
 				for (auto j : i->neighbors) {
 					if (!j->used) {
@@ -272,12 +178,12 @@ public:
 	void set_texture(const T& texcure, const node& n, matrix< info/*< TAG >*/ >& owner) {
 		if (texcure == max_T) {
 			std::cerr << "if (texcure == max_T)" << std::endl;
-			throw std::exception();
+			//throw std::exception();
 		}
-		if (cur_level.texture != texcure) {
+		if (cur_level->texture != texcure) {
 			clear();
 			clear_memory();
-			cur_level.texture = texcure;
+			cur_level->texture = texcure;
 			if (n.x + 2 < owner.get_w()) {
 				T x = n.x + 2, max_y = std::min(owner.get_h() - 1, n.y + 2);
 				for (T y = n.y > 2 ? n.y - 2 : 0; y <= max_y; y++) {
@@ -287,12 +193,147 @@ public:
 			}
 		}
 	}
+public:
+
+	info() : free(false), used(NONE), filling(), tag(), cur_level(std::make_shared< Level >()) {}
+	info(const T& texture) : cur_level(std::make_shared< Level >(texture)), free(false), filling(), tag(), used(NONE) {
+		levels.push_back(cur_level);
+	}
+	info(const std::list< T > & textures) : free(false), filling(), tag(), used(NONE) {
+		if (!textures.size()) {
+			std::cerr << "if (!textures.size())" << std::endl;
+		}
+		std::set< T > set_of_textures;
+		for (const T& texture : textures) {
+			if (!set_of_textures.count(texture)) {
+				levels.push_back(std::make_shared< Level >(texture));
+				set_of_textures.insert(texture);
+			}
+		}
+		cur_level = *levels.begin();
+	}
+	info(const info& inf) :
+		levels(inf.levels),
+		cur_level(inf.cur_level),
+		used(inf.used),
+		filling(inf.filling),
+		memory(inf.memory),
+		free(inf.free),
+		tag(inf.tag) {}
+	info& operator=(const info& inf) {
+		used = inf.used;
+		filling = inf.filling;
+		memory = inf.memory;
+		free = inf.free;
+		tag = inf.tag;
+		cur_level = inf.cur_level;
+		levels = inf.levels;
+		return *this;
+	}
+	info(info&& inf) :
+		cur_level(inf.cur_level),
+		levels(std::move(inf.levels)),
+		used(inf.used),
+		filling(inf.filling),
+		memory(std::move(inf.memory)),
+		free(inf.free),
+		tag(std::move(inf.tag)) {}
+	info& operator=(info&& inf) {
+		used = inf.used;
+		filling = inf.filling;
+		memory = std::move(inf.memory);
+		free = inf.free;
+		tag = std::move(inf.tag);
+		cur_level = inf.cur_level;
+		levels = std::move(inf.levels);
+		return *this;
+	}
+
+	inline bool can_be_used() const {
+		level l;
+		return can_be_used(l);
+	}
+	inline void clear() {
+		remove_from_the_level();
+		used = NONE;
+	}
+	//С‚РµРєСЃС‚СѓСЂР° РґРѕР»Р¶РЅР° СЃС‚Р°С‚СЊ РЅР° Р»СЋР±РѕР№ СЃРІРѕР±РѕРґРЅС‹Р№ СѓСЂРѕРІРµРЅСЊ, РєРѕС‚РѕСЂС‹Р№ РµС‰Рµ РЅРµ РёСЃРїРѕР»СЊР·РѕРІР°РЅ
+	inline bool use() {
+		if (free) return true;
+		level can_be_cur;
+		if (!can_be_used(can_be_cur)) return false;
+
+		remove_from_the_level();
+
+		//СЃРЅР°С‡Р°Р»Р° РїС‹С‚Р°РµРјСЃСЏ РґРѕР±Р°РІРёС‚СЊ С‚РµРєСЃС‚СѓСЂСѓ РЅР° С‚РѕС‚ СѓСЂРѕРІРµРЅСЊ, РЅР° РєРѕС‚РѕСЂРѕРј РµСЃС‚СЊ С‚Р°РєРёРµ Р¶Рµ
+		if ((FIRST & can_be_cur) && filling[0].get_count()) *cur_level = FIRST;
+		else if ((SECOND & can_be_cur) && filling[0].get_count()) *cur_level = SECOND;
+		else if ((THIRD & can_be_cur) && filling[0].get_count()) *cur_level = THIRD;
+		else if (FIRST & can_be_cur)  *cur_level = FIRST;
+		else if (SECOND & can_be_cur) *cur_level = SECOND;
+		else if (THIRD & can_be_cur)  *cur_level = THIRD;
+		else {
+			std::cerr << "impossible" << std::endl;//РїРѕС‚РѕРј СѓРґР°Р»РёС‚СЊ
+			//throw std::exception();
+		}
+
+		for (auto i : neighbors) {
+			i->give(cur_level->l, cur_level->texture);
+		}
+		this->give(cur_level->l, cur_level->texture);
+
+		used = level(used | cur_level->l);
+
+		return true;
+	}
+	inline bool was_used() {
+		return bool(used);
+	}
+
+	inline bool was_here() {
+		if (free) return true;
+		if (!used) {
+			std::cerr << "if (!used)" << std::endl;
+			//throw std::exception();
+		}
+
+		return memory[filling] & cur_level->l;
+		//return false;
+	}
+	inline void remember() {
+		if (free) return;
+		auto& level_ = memory[filling];
+		level_ = level(level_ | cur_level->l);
+	}
+	inline void clear_memory() {
+		memory.clear();
+	}
+
 	void set_and_use_the_most_popular_texture_from_neighbors(const node& n, matrix< info/*< TAG >*/ >& owner) {
-		std::map<T, char> counter;
-		T old_texture = cur_level.texture;
+		T old_texture = cur_level->texture;
 		clear();
+		{
+			auto iter = levels.begin();
+			auto end = levels.end();
+			while ((iter != end) && (*(iter++) != cur_level)) {}
+
+			for (; iter != end; iter++) {
+				cur_level = (*iter);
+				T texture = (*iter)->texture;
+				if ((texture != old_texture) && use()) {
+					cur_level->texture = old_texture;
+					set_texture(texture, n, owner);
+					use();
+					return;
+				}
+			}
+			cur_level = std::make_shared< Level >(old_texture);
+		}
+
+		//old code
+		std::map<T, char> counter;
 		for (auto neighbour : neighbors) {
-			if (neighbour->cur_level.texture != max_T) counter[neighbour->cur_level.texture]++;
+			if (neighbour->cur_level->texture != max_T) counter[neighbour->cur_level->texture]++;
 		}
 		std::vector< std::pair<T, char> > textures_in_order(counter.size());
 		size_t i = 0;
@@ -306,9 +347,9 @@ public:
 
 		sort(textures_in_order.rbegin(), textures_in_order.rend(), pair_T_char_less);
 		for (const auto& val : textures_in_order) {
-			cur_level.texture = val.first;
-			if ((cur_level.texture != old_texture) && use()) {
-				cur_level.texture = old_texture;
+			cur_level->texture = val.first;
+			if ((cur_level->texture != old_texture) && use()) {
+				cur_level->texture = old_texture;
 				set_texture(val.first, n, owner);
 				use();
 				return;
@@ -316,8 +357,23 @@ public:
 		}
 
 		std::cerr << "impossible happened in set_and_use_the_most_popular_texture_from_neighbours" << std::endl;
-		throw std::exception();
+		//throw std::exception();
 	}
+	void try_use_rest_of_levels() {
+		auto iter = levels.begin();
+		auto end = levels.end();
+		auto old_cur_level = cur_level;
+
+		while ((iter != end) && (*(iter++) != cur_level)) {}
+
+		for (; iter != end; iter++) {
+			cur_level = (*iter);
+			clear();
+			use();
+		}
+		cur_level = old_cur_level;
+	}
+
 	void set_neighbors(const node& n, matrix<info /*< TAG >*/ >& owner) {
 		auto neighbors_x_y = make_neighbors(n, owner.get_w(), owner.get_h());
 		neighbors = std::vector<info*>(neighbors_x_y.size());
@@ -338,14 +394,15 @@ public:
 		} fixer(filling);
 		filling = INFO();
 		for (auto i : neighbors) {
-			if (!i->cur_level) continue;
-			if (!(fixer.OK = this->give(i->cur_level.l, i->cur_level.texture), fixer.OK)) break;
+			if (!i->cur_level->l) continue;
+			if (!(fixer.OK = this->give(i->cur_level->l, i->cur_level->texture), fixer.OK)) break;
 		}
-		if (fixer.OK && this->cur_level) fixer.OK = this->give(this->cur_level.l, this->cur_level.texture);
+		if (fixer.OK && this->cur_level->l) fixer.OK = this->give(this->cur_level->l, this->cur_level->texture);
 		return fixer.OK;
 	}
-	inline Level get_cur_level() { return cur_level; }
-	inline T get_texture() { return cur_level.texture; }
+	inline Level get_cur_level() { return *cur_level; }
+	inline const std::list< std::shared_ptr< Level > >& get_levels() { return levels; }
+	inline T get_texture() { return cur_level->texture; }
 	inline T operator[](const size_t& i) { return filling[i].get_texture(); }
 
 	static void set_free(matrix< info /*< TAG >*/ >& owner) {
@@ -353,11 +410,11 @@ public:
 		for (T x = 0; x < w; x++) {
 			for (T y = 0; y < h; y++) {
 				owner(x, y).free = true;
-				texture = owner(x, y).cur_level.texture;
+				texture = owner(x, y).cur_level->texture;
 				for (int x_ = int(x) - 2; x_ <= x + 2; x_++) {
 					for (int y_ = int(y) - 2; y_ <= y + 2; y_++) {
 						if (x_ >= 0 && y_ >= 0 && x_ < w && y_ < h) {
-							if (owner(x_, y_).cur_level.texture != texture) {
+							if (owner(x_, y_).cur_level->texture != texture) {
 								owner(x, y).free = false;
 								x_ = x + 2;
 								break;
