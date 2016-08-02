@@ -3,7 +3,7 @@
 #include <limits.h>
 typedef unsigned short T;
 
-#define NUMBER_OF_LEVELS 3
+#define NUMBER_OF_LEVELS 3u
 
 extern const T max_T;
 extern const T MAX_DISTANCE, MIN_DISTANCE;

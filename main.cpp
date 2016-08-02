@@ -70,8 +70,8 @@ void print(const matrix< array<pair<T, bool>, 3> >& res){
 	print(res_to_source(res), res);
 }
 
-#define READ
-//#define WRITE
+//#define READ
+#define WRITE
 #define SOLVE
 //#define PRINT_SOLUTION
 
@@ -91,7 +91,7 @@ int main(){
 		}
 		in_stream.close();
 #else
-		const T w = 10, h = 10;
+		const T w = 1000, h = 1000;
 		matrix<T> source = gen_sourse_data(w, h, 5);
 #endif
 #ifdef WRITE

@@ -9,34 +9,58 @@
 
 using namespace std;
 
+inline std::vector< T > get_textures(const matrix< T >& m, const std::list< node > nodes) {
+	vector< T > res(nodes.size());
+	auto nodes_iter = nodes.begin();
+	for (auto& i : res) i = m[*nodes_iter++];
+	return res;
+}
 
+std::vector< T > get_popular_textures_in_order(const std::vector< T >& textures, const T& max_vector_len) {
+	std::map< T, int > map_textures;
+	for (const auto& t : textures) map_textures[t]++;
+	std::vector<T> res(std::min(max_vector_len, T(map_textures.size())));
+
+	map< int, set< T > > swapped_textures;
+	for (const auto& i : map_textures) swapped_textures[i.second].insert(i.first);
+	auto iter = swapped_textures.rbegin();
+	for (size_t i = 0; i < res.size(); iter++) {
+		for (const auto& j : iter->second) {
+			res[i++] = j;
+			if (i == res.size()) break;
+		}
+	}
+
+	return res;
+}
 
 //изменить в матрицу, которая может иметь решение
-void change_to_matrix_that_may_be_parsed_to_res(matrix< T >& res){
-	map< T , int > textures;
+
+void change_to_matrix_that_may_be_parsed_to_res(matrix< T >& res) {
+	map< T, int > textures;
 	list< node > neighbors;
 	T w = res.get_w(), h = res.get_h(), max_x = w - 1, max_y = h - 1;
 	T texture1 = 0, texture2;
 	int min, max;
-	for (T x = max_x > 1 ? 1 : 0; x < max_x; x++){
-		for (T y = max_y > 1 ? 1 : 0; y < max_y; y++){
+	for (T x = max_x > 1 ? 1 : 0; x < max_x; x++) {
+		for (T y = max_y > 1 ? 1 : 0; y < max_y; y++) {
 			textures.clear();
 			neighbors = make_neighbors(x, y, w, h);
 			neighbors.push_front(node(x, y));
-			for (const auto& i : neighbors){
+			for (const auto& i : neighbors) {
 				textures[res(i.x, i.y)]++;
 			}
 			max = 0;
-			for (const auto& i : textures){
-				if (i.second > max){
+			for (const auto& i : textures) {
+				if (i.second > max) {
 					max = i.second;
 					texture1 = i.first;
 				}
 			}
-			while (textures.size() > 3){
+			while (textures.size() > 3) {
 				min = max;
-				for (const auto& i : textures){
-					if (i.second <= min && i.first != texture1){
+				for (const auto& i : textures) {
+					if (i.second <= min && i.first != texture1) {
 						min = i.second;
 						texture2 = i.first;
 					}
@@ -44,12 +68,26 @@ void change_to_matrix_that_may_be_parsed_to_res(matrix< T >& res){
 				textures.erase(texture2);
 			}
 
-			for (const auto& i : neighbors){
+			for (const auto& i : neighbors) {
 				if (!textures.count(res(i.x, i.y))) res(i.x, i.y) = texture1;
 			}
 		}
 	}
 }
+
+//void change_to_matrix_that_may_be_parsed_to_res(matrix< T >& res){
+//	T w = res.get_w(), h = res.get_h();
+//	std::list< node > neighbors;
+//	std::vector< T > accessible_textures;
+//	for (T x = 1; x < w; x++){
+//		for (T y = 0; y < h; y++){
+//			accessible_textures = get_popular_textures_in_order(get_textures(res, make_neighbors(x, y, w, h, neighbor_number::N1 | neighbor_number::N2 | neighbor_number::N7 | neighbor_number::N8)));
+//			if (accessible_textures.size() == NUMBER_OF_LEVELS && !contains(accessible_textures, res(x, y)))
+//				res(x, y) = accessible_textures[0];
+//		}
+//	}
+//}
+
 matrix< T > res_to_source(const  matrix< array<pair<T, bool>, 3> >& res) {
 	auto w = res.get_w(), h = res.get_h();
 	matrix< T > source(w, h);

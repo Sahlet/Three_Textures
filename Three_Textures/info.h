@@ -213,25 +213,36 @@ public:
 		cur_level = *levels.begin();
 	}
 	info(const info& inf) :
-		levels(inf.levels),
-		cur_level(inf.cur_level),
 		used(inf.used),
 		filling(inf.filling),
 		memory(inf.memory),
 		free(inf.free),
-		tag(inf.tag) {}
+		tag(inf.tag) {
+		for (const auto& val : inf.levels){
+			levels.push_back(std::shared_ptr<Level>(new Level(*val)));
+			if (!cur_level && val == inf.cur_level) cur_level = *levels.rbegin();
+		}
+		if (!cur_level) cur_level.reset(new Level(*inf.cur_level));
+	}
 	info& operator=(const info& inf) {
 		used = inf.used;
 		filling = inf.filling;
 		memory = inf.memory;
 		free = inf.free;
 		tag = inf.tag;
-		cur_level.reset(new Level(*inf.cur_level));
-		levels = inf.levels;
+
+		cur_level = nullptr;
+		levels.clear();
+		for (const auto& val : inf.levels) {
+			levels.push_back(std::shared_ptr<Level>(new Level(*val)));
+			if (!cur_level && val == inf.cur_level) cur_level = *levels.rbegin();
+		}
+		if (!cur_level) cur_level.reset(new Level(*inf.cur_level));
+
 		return *this;
 	}
 	info(info&& inf) :
-		cur_level(inf.cur_level),
+		cur_level(std::move(inf.cur_level)),
 		levels(std::move(inf.levels)),
 		used(inf.used),
 		filling(inf.filling),
@@ -244,7 +255,7 @@ public:
 		memory = std::move(inf.memory);
 		free = inf.free;
 		tag = std::move(inf.tag);
-		cur_level = inf.cur_level;
+		cur_level = std::move(inf.cur_level);
 		levels = std::move(inf.levels);
 		return *this;
 	}

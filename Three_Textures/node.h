@@ -8,7 +8,7 @@ struct node {
 	node(const T& x = 0, const T& y = 0) : x(x), y(y) {}
 	node(const std::pair< T, T >& p) : x(p.first), y(p.second) {}
 	node(const node& n) : x(n.x), y(n.y) {}
-	inline operator std::pair< T, T >() {
+	inline operator std::pair< T, T >() const {
 		return std::pair< T, T >(x, y);
 	}
 	inline bool operator<(const node& n) const {
